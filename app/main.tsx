@@ -35,6 +35,11 @@ const SwapLayout = lazy(() => import('./pages/swap/Layout'));
 const SwapIndex = lazy(() => import('./pages/swap/Index'));
 const PointsLayout = lazy(() => import('./pages/points/Layout'));
 const PointsIndex = lazy(() => import('./pages/points/Index'));
+const AdminLayout = lazy(() => import('./pages/admin/Layout'));
+const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
+const AdminAnalytics = lazy(() => import('./pages/admin/Analytics'));
+const AdminAppearance = lazy(() => import('./pages/admin/Appearance'));
+const AdminSettings = lazy(() => import('./pages/admin/Settings'));
 
 
 async function loadRuntimeConfig() {
@@ -149,6 +154,16 @@ const router = createBrowserRouter([
         element: <PointsLayout />,
         children: [
           { index: true, element: <PointsIndex /> },
+        ],
+      },
+      {
+        path: 'admin',
+        element: <AdminLayout />,
+        children: [
+          { index: true, element: <AdminDashboard /> },
+          { path: 'analytics', element: <AdminAnalytics /> },
+          { path: 'appearance', element: <AdminAppearance /> },
+          { path: 'settings', element: <AdminSettings /> },
         ],
       },
     ],
