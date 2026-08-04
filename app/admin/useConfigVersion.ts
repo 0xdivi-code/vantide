@@ -10,5 +10,9 @@ import {
  * page reload.
  */
 export function useConfigVersion(): number {
-  return useSyncExternalStore(subscribeAdminStore, getAdminStoreVersion);
+  return useSyncExternalStore(
+    subscribeAdminStore,
+    getAdminStoreVersion,
+    getAdminStoreVersion
+  );
 }

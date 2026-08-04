@@ -14,12 +14,15 @@ function loadConfigTitle(): string {
     }
 
     const configText = fs.readFileSync(configPath, "utf-8");
-    const jsonText = configText
-      .replace(/window\.__RUNTIME_CONFIG__\s*=\s*/, "")
-      .replace(/;$/, "")
-      .trim();
+    // config.js is a JavaScript object literal (unquoted keys, comments,
+    // trailing commas) — not JSON. Evaluate it the same way the browser does.
+    const sandboxWindow: Record<string, unknown> = {};
+    const evaluate = new Function(
+      "window",
+      `"use strict";\n${configText}\nreturn window.__RUNTIME_CONFIG__ || {};`
+    );
+    const config = evaluate(sandboxWindow) as Record<string, string>;
 
-    const config = JSON.parse(jsonText);
     return config.VITE_ORDERLY_BROKER_NAME || "Vantide Perps";
   } catch (error) {
     console.warn("Failed to load title from config.js:", error);

@@ -1,7 +1,7 @@
 {
-  "name": "Vantide Perp DEX",
-  "short_name": "Vantide Perp DEX",
-  "description": "A powerful perpetual trading DEX",
+  "name": "Vantide",
+  "short_name": "Vantide",
+  "description": "Orderly Trading Application",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
