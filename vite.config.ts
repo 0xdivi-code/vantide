@@ -47,6 +47,13 @@ export default defineConfig(() => {
 
   return {
     base: basePath,
+    server: {
+      // Allow Arena / e2b live-preview proxy hosts
+      allowedHosts: [".e2b.app"],
+    },
+    preview: {
+      allowedHosts: [".e2b.app"],
+    },
     plugins: [
       react(),
       tsconfigPaths(),
