@@ -1,301 +1,300 @@
 import { useMemo, useState } from "react";
 import {
-  Eye,
-  Users,
-  MousePointerClick,
-  TrendingUp,
-  Trash2,
-  BarChart3,
-  Globe,
-  Code2,
+  TrendingUp, Users, CircleDollarSign, Globe2, Repeat, MousePointerClick,
+  Gauge, Flame, Sigma,
 } from "lucide-react";
-import { Link } from "react-router-dom";
-import {
-  clearAnalyticsEvents,
-  getAnalyticsSummary,
-} from "@/admin/analytics";
-import { getRuntimeConfig } from "@/utils/runtime-config";
-import {
-  Card,
-  StatCard,
-  Badge,
-  AdminButton,
-  PageHeader,
-  EmptyState,
-  FlashBanner,
-  useFlashMessage,
-  Toggle,
-} from "@/admin/components/ui";
-import { setAdminOverride, getAdminOverrideValue } from "@/admin/adminStore";
+import { buildAnalytics , COUNTRIES, TRADE_TOTAL, USER_TOTAL } from "@/admin/mock/data";
+import { mulberry32, int, float, fmtNum, fmtUsd } from "@/admin/mock/rng";
+import { PageHeader, Badge, AdminButton, Card, StatCard } from "@/admin/components/ui";
+import { AreaChart, BarChart, RankedBars, DonutChart } from "@/admin/components/Charts";
+import { DataTable, type Column } from "@/admin/components/DataTable";
+import { Skeleton, useMockLoading } from "@/admin/components/feedback";
+import { getAnalyticsSummary } from "@/admin/analytics";
 
-function formatTime(ts: number): string {
-  return new Date(ts).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+type MetricKey =
+  | "volume" | "revenue" | "users" | "trades" | "fees" | "funding"
+  | "openInterest" | "liquidations" | "leverage";
 
-/** Simple SVG bar chart for daily page views (no chart lib dependency). */
-function ViewsChart({
-  data,
-}: {
-  data: { date: string; label: string; views: number; sessions: number }[];
-}) {
-  const [hover, setHover] = useState<number | null>(null);
-  const max = Math.max(1, ...data.map((d) => d.views));
-  const W = 720;
-  const H = 200;
-  const PAD = 4;
-  const barGap = 6;
-  const barWidth = Math.max(8, (W - PAD * 2 - barGap * (data.length - 1)) / data.length);
-
-  return (
-    <div className="relative">
-      <svg viewBox={`0 0 ${W} ${H + 28}`} className="w-full">
-        {/* grid lines */}
-        {[0.25, 0.5, 0.75, 1].map((f) => (
-          <line
-            key={f}
-            x1={PAD}
-            x2={W - PAD}
-            y1={H - H * 0.85 * f + 10}
-            y2={H - H * 0.85 * f + 10}
-            stroke="rgba(255,255,255,0.06)"
-            strokeDasharray="3 4"
-          />
-        ))}
-        {data.map((d, i) => {
-          const h = Math.max(2, (d.views / max) * (H * 0.85));
-          const x = PAD + i * (barWidth + barGap);
-          const y = H + 10 - h;
-          const active = hover === i;
-          return (
-            <g
-              key={d.date}
-              onMouseEnter={() => setHover(i)}
-              onMouseLeave={() => setHover(null)}
-              style={{ cursor: "default" }}
-            >
-              <rect
-                x={x}
-                y={y}
-                width={barWidth}
-                height={h}
-                rx={4}
-                fill={
-                  active
-                    ? "rgb(var(--oui-color-primary-light))"
-                    : "rgb(var(--oui-color-primary))"
-                }
-                opacity={d.views === 0 ? 0.15 : active ? 1 : 0.85}
-              />
-              {(i % 2 === 0 || data.length < 10) && (
-                <text
-                  x={x + barWidth / 2}
-                  y={H + 24}
-                  textAnchor="middle"
-                  fontSize={10}
-                  fill="rgba(255,255,255,0.35)"
-                >
-                  {d.label}
-                </text>
-              )}
-              {/* invisible hover target */}
-              <rect x={x} y={0} width={barWidth} height={H + 10} fill="transparent" />
-            </g>
-          );
-        })}
-      </svg>
-      {hover !== null && (
-        <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 rounded-lg border border-white/10 bg-[rgb(var(--oui-color-base-6))] px-3 py-1.5 text-xs shadow-lg">
-          <span className="font-semibold text-white">{data[hover].label}</span>
-          <span className="ml-2 text-white/60">
-            {data[hover].views} views · {data[hover].sessions} sessions
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
+const METRICS: { key: MetricKey; label: string; format: (v: number) => string; color?: string }[] = [
+  { key: "volume", label: "Volume", format: (v) => fmtUsd(v) },
+  { key: "revenue", label: "Revenue", format: (v) => fmtUsd(v), color: "rgb(var(--oui-color-success))" },
+  { key: "users", label: "New users", format: (v) => `${fmtNum(v)}` },
+  { key: "trades", label: "Trades", format: (v) => fmtNum(v) },
+  { key: "fees", label: "Fees", format: (v) => fmtUsd(v) },
+  { key: "funding", label: "Funding paid", format: (v) => fmtUsd(v) },
+  { key: "openInterest", label: "Open interest", format: (v) => fmtUsd(v), color: "rgb(var(--oui-color-warning))" },
+  { key: "liquidations", label: "Liquidations", format: (v) => fmtUsd(v), color: "rgb(var(--oui-color-danger))" },
+  { key: "leverage", label: "Avg leverage", format: (v) => `${v}x` },
+];
 
 export default function AdminAnalytics() {
-  const [refreshTick, setRefreshTick] = useState(0);
-  const { message, show } = useFlashMessage();
+  const loading = useMockLoading(450);
+  const [metric, setMetric] = useState<MetricKey>("volume");
+  const [range, setRange] = useState(30);
 
-  const enabled =
-    (getAdminOverrideValue("VITE_ADMIN_ANALYTICS_ENABLED") ??
-      getRuntimeConfig("VITE_ADMIN_ANALYTICS_ENABLED")) !== "false";
+  const series = useMemo(() => buildAnalytics(range), [range]);
+  const metricDef = METRICS.find((m) => m.key === metric)!;
+  const data = series[metric === "openInterest" ? "openInterest" : metric];
 
-  // refreshTick and enabled re-pull the (externally-stored) analytics data
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const summary = useMemo(() => getAnalyticsSummary(), [refreshTick, enabled]);
+  const totals = useMemo(() => {
+    const idx = METRICS.map((m) => m.key);
+    return idx.map((k) => ({
+      key: k,
+      total: (series[k] as number[]).reduce((s, v) => s + v, 0),
+    }));
+  }, [series]);
 
-  const onClear = () => {
-    if (
-      window.confirm(
-        "Delete all locally tracked page-view data? This cannot be undone."
-      )
-    ) {
-      clearAnalyticsEvents();
-      setRefreshTick((t) => t + 1);
-      show("success", "Analytics data cleared.");
-    }
-  };
+  const countries = useMemo(() => {
+    const r = mulberry32(616);
+    return [...COUNTRIES]
+      .map((c) => ({ label: c, value: float(r, 0.5, 14, 1) }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
+  }, []);
 
-  const onToggleTracking = (value: boolean) => {
-    const result = setAdminOverride(
-      "VITE_ADMIN_ANALYTICS_ENABLED",
-      value ? "true" : "false"
+  const topTraders = useMemo(() => {
+    const r = mulberry32(717);
+    return Array.from({ length: 10 }, (_, i) => ({
+      id: `tt_${i}`,
+      wallet: `0x${Math.floor(r() * 0xffffff).toString(16).padStart(6, "0")}…${Math.floor(r() * 0xffff).toString(16).padStart(4, "0")}`,
+      volume: float(r, 4_000_000, 210_000_000, 0) * (1 - i * 0.07),
+      pnl: float(r, -900_000, 4_800_000, 0) * (1 - i * 0.05),
+      winRate: float(r, 44, 72, 1),
+      trades: int(r, 400, 8600),
+    })).sort((a, b) => b.volume - a.volume);
+  }, []);
+
+  const topMarkets = useMemo(() => {
+    const r = mulberry32(818);
+    return ["BTC/USDT", "ETH/USDT", "SOL/USDT", "PEPE/USDT", "DOGE/USDT", "HYPE/USDT"].map((label) => ({
+      label,
+      value: float(r, 0.4, 9, 2) * 1e8,
+    })).sort((a, b) => b.value - a.value);
+  }, []);
+
+  const funnel = useMemo(() => {
+    const r = mulberry32(919);
+    const visitors = int(r, 34000, 52000);
+    const signups = Math.round(visitors * float(r, 0.24, 0.32, 3));
+    const firstDeposits = Math.round(signups * float(r, 0.44, 0.58, 3));
+    const firstTrades = Math.round(firstDeposits * float(r, 0.7, 0.85, 3));
+    const active7d = Math.round(firstTrades * float(r, 0.5, 0.72, 3));
+    return [
+      { label: "Visitors", value: visitors },
+      { label: "Signups", value: signups },
+      { label: "First deposit", value: firstDeposits },
+      { label: "First trade", value: firstTrades },
+      { label: "Active (7d)", value: active7d },
+    ];
+  }, []);
+
+  const local = getAnalyticsSummary();
+
+  const traderCols: Column<(typeof topTraders)[number]>[] = [
+    { key: "wallet", label: "Trader", render: (t) => <span className="font-mono text-xs text-white/65">{t.wallet}</span> },
+    { key: "vol", label: "Volume", align: "right", sortValue: (t) => t.volume, render: (t) => fmtUsd(t.volume), csvValue: (t) => String(t.volume) },
+    {
+      key: "pnl", label: "PnL", align: "right", sortValue: (t) => t.pnl,
+      render: (t) => <span className={t.pnl >= 0 ? "text-[rgb(var(--oui-color-trading-profit))]" : "text-[rgb(var(--oui-color-trading-loss))]"}>{fmtUsd(t.pnl)}</span>,
+    },
+    { key: "wr", label: "Win rate", align: "right", sortValue: (t) => t.winRate, render: (t) => `${t.winRate}%` },
+    { key: "trades", label: "Trades", align: "right", sortValue: (t) => t.trades, render: (t) => fmtNum(t.trades) },
+  ];
+
+  if (loading) {
+    return (
+      <div className="space-y-5">
+        <Skeleton className="h-9 w-64" />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[74px]" />)}</div>
+        <Skeleton className="h-72" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2"><Skeleton className="h-64" /><Skeleton className="h-64" /></div>
+      </div>
     );
-    if (result.ok) {
-      show("success", value ? "Tracking enabled." : "Tracking disabled.");
-    } else {
-      show("error", result.error);
-    }
-    setRefreshTick((t) => t + 1);
-  };
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title="Analytics"
-        description="Page-view statistics tracked locally in this browser. For cross-user analytics, connect an external analytics script."
+        description="Venue-wide metrics from the mock warehouse. Metric and range selectors reshape every chart."
         actions={
-          <AdminButton variant="danger" onClick={onClear}>
-            <Trash2 size={15} />
-            Clear data
-          </AdminButton>
+          <div className="flex gap-1 rounded-lg border border-white/10 bg-[rgb(var(--oui-color-base-9))] p-1">
+            {[7, 30, 90].map((d) => (
+              <button
+                key={d}
+                onClick={() => setRange(d)}
+                className={`rounded-md px-3 py-1 text-xs font-medium ${range === d ? "bg-[rgba(var(--oui-color-primary),0.2)] text-[rgb(var(--oui-color-primary-light))]" : "text-white/45 hover:text-white/75"}`}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
         }
       />
 
-      <FlashBanner message={message} />
-
-      {!enabled && (
-        <div className="rounded-lg border border-[rgba(var(--oui-color-warning),0.35)] bg-[rgba(var(--oui-color-warning),0.08)] px-4 py-3 text-sm text-[rgb(var(--oui-color-warning))]">
-          Built-in tracking is currently disabled. New page views are not being
-          recorded.
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={Eye} label="Total page views" value={summary.totalViews} />
-        <StatCard
-          icon={MousePointerClick}
-          label="Views today"
-          value={summary.todayViews}
-        />
-        <StatCard icon={Users} label="Unique sessions" value={summary.uniqueSessions} />
-        <StatCard
-          icon={TrendingUp}
-          label="Avg. views / session"
-          value={summary.avgViewsPerSession}
-        />
+      {/* Totals */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard icon={TrendingUp} label={`Volume (${range}d)`} value={fmtUsd(totals.find((t) => t.key === "volume")?.total ?? 0)} />
+        <StatCard icon={CircleDollarSign} label={`Revenue (${range}d)`} value={fmtUsd(totals.find((t) => t.key === "revenue")?.total ?? 0)} accent="success" />
+        <StatCard icon={Users} label={`New users (${range}d)`} value={fmtNum(totals.find((t) => t.key === "users")?.total ?? 0)} hint={`${fmtNum(USER_TOTAL)} total`} />
+        <StatCard icon={Sigma} label={`Trades (${range}d)`} value={fmtNum(totals.find((t) => t.key === "trades")?.total ?? 0)} hint={`${fmtNum(TRADE_TOTAL)} lifetime`} />
       </div>
 
+      {/* Metric explorer */}
       <Card
-        title="Page views — last 14 days"
-        subtitle="Hover a bar for details"
+        title="Metric explorer"
+        subtitle="Click a metric to chart it"
         actions={
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-white/45">Tracking</span>
-            <Toggle checked={enabled} onChange={onToggleTracking} />
-          </div>
+          <Badge tone="primary">{metricDef.label}</Badge>
         }
       >
-        {summary.totalViews === 0 ? (
-          <EmptyState
-            icon={BarChart3}
-            title="No data yet"
-            description="Page views are recorded as people browse the dapp on this browser. Visit a few pages and come back."
-          />
-        ) : (
-          <ViewsChart data={summary.daily} />
-        )}
+        <div className="mb-4 flex flex-wrap gap-1.5">
+          {METRICS.map((m) => (
+            <button
+              key={m.key}
+              onClick={() => setMetric(m.key)}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                metric === m.key
+                  ? "border-[rgba(var(--oui-color-primary),0.6)] bg-[rgba(var(--oui-color-primary),0.15)] text-[rgb(var(--oui-color-primary-light))]"
+                  : "border-white/10 bg-white/[0.03] text-white/45 hover:text-white/75"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <AreaChart labels={series.labels} data={data as number[]} color={metricDef.color ?? "rgb(var(--oui-color-primary))"} formatValue={metricDef.format} height={260} />
       </Card>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card title="Top pages" subtitle="Most visited routes">
-          {summary.topPages.length === 0 ? (
-            <EmptyState icon={Globe} title="Nothing tracked yet" />
-          ) : (
-            <ul className="space-y-2">
-              {summary.topPages.map((page) => {
-                const pct = Math.round((page.views / summary.totalViews) * 100);
-                return (
-                  <li key={page.path}>
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="max-w-[70%] truncate font-mono text-white/75">
-                        {page.path}
-                      </span>
-                      <span className="text-white/40">
-                        {page.views} ({pct}%)
-                      </span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
-                      <div
-                        className="h-full rounded-full bg-[rgb(var(--oui-color-primary))]"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        {/* Retention heatmap */}
+        <Card title="Weekly retention" subtitle="Signup cohorts — % still trading">
+          <table className="w-full text-center text-[11px]">
+            <thead>
+              <tr className="text-white/30">
+                <th className="pb-1.5 text-left font-medium">Cohort</th>
+                {[0, 1, 2, 3, 4, 5].map((w) => <th key={w} className="pb-1.5 font-medium">W{w}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {series.retention.map((row, i) => (
+                <tr key={i}>
+                  <td className="py-0.5 pr-2 text-left text-white/40">{`Week ${i + 1}`}</td>
+                  {[0, 1, 2, 3, 4, 5].map((w) => {
+                    const v = row[w];
+                    if (v === undefined) return <td key={w} />;
+                    return (
+                      <td key={w} className="p-0.5">
+                        <span
+                          className="inline-block w-full rounded-md py-1.5 text-white"
+                          style={{ background: `rgba(var(--oui-color-primary), ${Math.max(0.08, v / 130)})` }}
+                        >
+                          {v}%
+                        </span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </Card>
 
-        <Card title="Recent activity" subtitle="Latest tracked page views">
-          {summary.recent.length === 0 ? (
-            <EmptyState icon={Eye} title="No events yet" />
-          ) : (
-            <ul className="divide-y divide-white/5">
-              {summary.recent.map((event, i) => (
-                <li key={`${event.t}-${i}`} className="flex items-center justify-between gap-3 py-2">
-                  <span className="truncate font-mono text-xs text-white/75">
-                    {event.p}
-                  </span>
-                  <span className="shrink-0 text-[11px] text-white/30">
-                    {formatTime(event.t)}
-                  </span>
+        {/* Conversion funnel */}
+        <Card title="Acquisition funnel" subtitle={`Last ${range} days`}>
+          <ul className="space-y-2.5">
+            {funnel.map((step, i) => {
+              const pct = Math.round((step.value / funnel[0].value) * 100);
+              return (
+                <li key={step.label}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="text-white/60">{i + 1}. {step.label}</span>
+                    <span className="font-medium text-white/85">{fmtNum(step.value)} · {pct}%</span>
+                  </div>
+                  <div className="h-5 overflow-hidden rounded-md bg-white/5">
+                    <div
+                      className="flex h-full items-center rounded-md bg-gradient-to-r from-[rgb(var(--oui-color-primary-darken))] to-[rgb(var(--oui-color-primary))] pl-2 text-[10px] font-semibold text-white"
+                      style={{ width: `${Math.max(8, pct)}%` }}
+                    />
+                  </div>
                 </li>
-              ))}
-            </ul>
-          )}
+              );
+            })}
+          </ul>
+        </Card>
+
+        {/* Countries */}
+        <Card title="Country distribution" subtitle="Share of active traders">
+          <DonutChart
+            segments={countries.slice(0, 5).map((c) => ({ label: c.label, value: c.value }))}
+            centerValue={countries[0].label.slice(0, 2).toUpperCase()}
+            centerLabel="top region"
+          />
         </Card>
       </div>
 
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <Card title="Top markets" subtitle={`Volume share (${range}d)`}>
+          <RankedBars items={topMarkets} formatValue={(v) => fmtUsd(v)} />
+        </Card>
+        <Card title="Traffic sources" subtitle="Where signups come from">
+          <RankedBars
+            items={[
+              { label: "Organic / Direct", value: 38 },
+              { label: "Referral links", value: 27 },
+              { label: "Twitter / X", value: 16 },
+              { label: "Discord", value: 11 },
+              { label: "Paid ads", value: 8 },
+            ]}
+            formatValue={(v) => `${v}%`}
+          />
+        </Card>
+        <Card title="Liquidations vs volume" subtitle="Risk pulse">
+          <BarChart labels={series.labels.slice(-14)} data={series.liquidations.slice(-14)} height={170} color="rgb(var(--oui-color-danger))" formatValue={(v) => fmtUsd(v)} />
+        </Card>
+      </div>
+
+      {/* Top traders */}
+      <div>
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
+          <Gauge size={15} className="text-[rgb(var(--oui-color-primary-light))]" /> Top traders
+        </h2>
+        <DataTable tableKey="top-traders" columns={traderCols} rows={topTraders} pageSize={10} emptyTitle="No data" />
+      </div>
+
+      {/* Real local analytics */}
       <Card
-        title="External analytics"
-        subtitle="Track all visitors, not just this browser"
+        title="Real on-device tracking"
+        subtitle="Unlike the mock data above, these are visits actually recorded in this browser by the built-in tracker"
+        actions={<Badge tone={local.enabled ? "success" : "neutral"}>{local.enabled ? "tracking on" : "tracking off"}</Badge>}
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 text-white/50">
-              <Code2 size={18} />
-            </div>
-            <div>
-              <div className="text-sm text-white/80">
-                Analytics script injection
-              </div>
-              <div className="text-xs text-white/40">
-                {summary.externalScriptConfigured
-                  ? "An external analytics script is configured and injected on every page."
-                  : "Add Google Analytics, Plausible, etc. via VITE_ANALYTICS_SCRIPT."}
-              </div>
-            </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard icon={MousePointerClick} label="Page views (device)" value={local.totalViews} />
+          <StatCard icon={Users} label="Unique sessions" value={local.uniqueSessions} />
+          <StatCard icon={Repeat} label="Avg views/session" value={local.avgViewsPerSession} />
+          <StatCard icon={Flame} label="Views today" value={local.todayViews} />
+        </div>
+        {local.topPages.length > 0 && (
+          <div className="mt-4">
+            <RankedBars items={local.topPages.slice(0, 5).map((p) => ({ label: p.path, value: p.views }))} formatValue={(v) => `${v} views`} />
           </div>
-          <div className="flex items-center gap-3">
-            <Badge tone={summary.externalScriptConfigured ? "success" : "neutral"}>
-              {summary.externalScriptConfigured ? "Configured" : "Not configured"}
-            </Badge>
-            <Link to="/admin/settings">
-              <AdminButton>Configure</AdminButton>
-            </Link>
-          </div>
+        )}
+        {!local.externalScriptConfigured && (
+          <p className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-[11px] text-white/40">
+            For cross-visitor analytics connect Google Analytics/Plausible via{" "}
+            <span className="text-white/70">Config Editor → VITE_ANALYTICS_SCRIPT</span>.
+          </p>
+        )}
+        <div className="mt-3 flex items-center gap-2 text-[11px] text-white/30">
+          <Globe2 size={11} /> Built-in tracker skips /admin pages and never leaves this browser.
         </div>
       </Card>
+
+      <div className="flex justify-end">
+        <AdminButton variant="ghost" className="text-xs" onClick={() => setRange((r) => r)}>
+          Refresh
+        </AdminButton>
+      </div>
     </div>
   );
 }

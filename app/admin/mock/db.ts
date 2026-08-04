@@ -1,0 +1,56 @@
+/** The mock database: one collection per entity, seeded + persisted. */
+
+import { collection } from "./engine";
+import {
+  seedUsers,
+  seedPairs,
+  seedTrades,
+  seedOrders,
+  seedPositions,
+  seedLiquidations,
+  seedFunding,
+  seedWallets,
+  seedTransfers,
+  seedDeposits,
+  seedWithdrawals,
+  seedAffiliates,
+  seedCommissions,
+  seedCampaigns,
+  seedDistributions,
+  seedKyc,
+  seedNotifications,
+  seedCms,
+  seedLogins,
+  seedBlockedIps,
+  seedSecurityAlerts,
+  seedTickets,
+  seedAdmins,
+} from "./data";
+
+export const db = {
+  users: collection("users", seedUsers),
+  pairs: collection("pairs", seedPairs),
+  trades: collection("trades", seedTrades),
+  orders: collection("orders", seedOrders),
+  positions: collection("positions", seedPositions),
+  liquidations: collection("liquidations", seedLiquidations),
+  funding: collection("funding", seedFunding),
+  wallets: collection("wallets", seedWallets),
+  transfers: collection("transfers", seedTransfers),
+  deposits: collection("deposits", seedDeposits),
+  withdrawals: collection("withdrawals", seedWithdrawals),
+  affiliates: collection("affiliates", seedAffiliates),
+  commissions: collection("commissions", seedCommissions),
+  campaigns: collection("campaigns", seedCampaigns),
+  distributions: collection("distributions", seedDistributions),
+  kyc: collection("kyc", seedKyc),
+  notifications: collection("notifications", seedNotifications),
+  cms: collection("cms", seedCms),
+  logins: collection("logins", seedLogins),
+  blockedIps: collection("blocked-ips", seedBlockedIps),
+  securityAlerts: collection("security-alerts", seedSecurityAlerts),
+  tickets: collection("tickets", seedTickets),
+  admins: collection("admins", seedAdmins),
+};
+
+export type { AdminAccount } from "./types";

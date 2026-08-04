@@ -40,6 +40,21 @@ const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
 const AdminAnalytics = lazy(() => import('./pages/admin/Analytics'));
 const AdminAppearance = lazy(() => import('./pages/admin/Appearance'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
+const AdminUsers = lazy(() => import('./pages/admin/Users'));
+const AdminUserDetail = lazy(() => import('./pages/admin/UserDetail'));
+const AdminPairs = lazy(() => import('./pages/admin/Pairs'));
+const AdminRisk = lazy(() => import('./pages/admin/Risk'));
+const AdminFees = lazy(() => import('./pages/admin/Fees'));
+const AdminTreasury = lazy(() => import('./pages/admin/Treasury'));
+const AdminFunding = lazy(() => import('./pages/admin/Funding'));
+const AdminReferrals = lazy(() => import('./pages/admin/Referrals'));
+const AdminRewards = lazy(() => import('./pages/admin/Rewards'));
+const AdminNotifications = lazy(() => import('./pages/admin/Notifications'));
+const AdminCms = lazy(() => import('./pages/admin/Cms'));
+const AdminKyc = lazy(() => import('./pages/admin/Kyc'));
+const AdminSecurity = lazy(() => import('./pages/admin/Security'));
+const AdminSupport = lazy(() => import('./pages/admin/Support'));
+const AdminSystem = lazy(() => import('./pages/admin/System'));
 
 
 async function loadRuntimeConfig() {
@@ -162,6 +177,21 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <AdminDashboard /> },
           { path: 'analytics', element: <AdminAnalytics /> },
+          { path: 'users', element: <AdminUsers /> },
+          { path: 'users/:userId', element: <AdminUserDetail /> },
+          { path: 'pairs', element: <AdminPairs /> },
+          { path: 'risk', element: <AdminRisk /> },
+          { path: 'fees', element: <AdminFees /> },
+          { path: 'treasury', element: <AdminTreasury /> },
+          { path: 'funding', element: <AdminFunding /> },
+          { path: 'referrals', element: <AdminReferrals /> },
+          { path: 'rewards', element: <AdminRewards /> },
+          { path: 'notifications', element: <AdminNotifications /> },
+          { path: 'cms', element: <AdminCms /> },
+          { path: 'kyc', element: <AdminKyc /> },
+          { path: 'security', element: <AdminSecurity /> },
+          { path: 'support', element: <AdminSupport /> },
+          { path: 'system', element: <AdminSystem /> },
           { path: 'appearance', element: <AdminAppearance /> },
           { path: 'settings', element: <AdminSettings /> },
         ],

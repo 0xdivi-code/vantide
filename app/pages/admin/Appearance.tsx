@@ -27,6 +27,7 @@ import {
   useFlashMessage,
   FlashMessage,
 } from "@/admin/components/ui";
+import { ThemeEditor } from "@/admin/components/ThemeEditor";
 
 const MAX_FILE_BYTES = 1.5 * 1024 * 1024; // hard limit for localStorage
 const WARN_FILE_BYTES = 250 * 1024;
@@ -305,6 +306,8 @@ export default function AdminAppearance() {
       />
 
       <FlashBanner message={message} />
+
+      <ThemeEditor />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <LogoSlot def={slots[0]} onFlash={show} icon={MonitorSmartphone} />

@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet-async";
 import OrderlyProvider from "@/components/orderlyProvider";
 import { HttpsRequiredWarning } from "@/components/HttpsRequiredWarning";
 import AnalyticsTracker from "@/admin/AnalyticsTracker";
+import ThemeInjector from "@/admin/ThemeInjector";
 import { useConfigVersion } from "@/admin/useConfigVersion";
 import { getRuntimeConfig } from "./utils/runtime-config";
 import { withBasePath } from "./utils/base-path";
@@ -26,6 +27,7 @@ export default function App() {
       </Helmet>
       <HttpsRequiredWarning />
       <AnalyticsTracker />
+      <ThemeInjector />
       <OrderlyProvider>
         <Outlet />
       </OrderlyProvider>

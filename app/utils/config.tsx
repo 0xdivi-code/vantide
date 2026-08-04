@@ -7,7 +7,7 @@ import {
   MainNavWidgetProps,
 } from "@orderly.network/ui-scaffold";
 import { AppLogos } from "@orderly.network/react-app";
-import { OrderlyActiveIcon, OrderlyIcon } from "../components/icons/orderly";
+
 import { withBasePath } from "./base-path";
 import {
   PortfolioActiveIcon,
