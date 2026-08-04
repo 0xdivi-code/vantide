@@ -1,6 +1,8 @@
 // Runtime configuration utility
 // This allows reading config from window.__RUNTIME_CONFIG__ with fallbacks to import.meta.env
 
+import { getAdminOverrideValue } from "../admin/adminStore";
+
 declare global {
   interface Window {
     __RUNTIME_CONFIG__?: Record<string, string>;
@@ -8,10 +10,20 @@ declare global {
 }
 
 /**
- * Get a configuration value from runtime config with fallback to build-time env var
- * This allows changing config without rebuilds by modifying public/config.js
+ * Get a configuration value. Resolution order:
+ *   1. Admin panel overrides (localStorage, set via the /admin panel)
+ *   2. window.__RUNTIME_CONFIG__ (public/config.js)
+ *   3. build-time environment variables (import.meta.env)
+ *
+ * An admin override of "" explicitly force-clears a value from a lower
+ * priority source.
  */
 export function getRuntimeConfig(key: string): string | undefined {
+  const adminValue = getAdminOverrideValue(key);
+  if (adminValue !== undefined) {
+    return adminValue === "" ? undefined : adminValue;
+  }
+
   if (typeof window !== "undefined" && window.__RUNTIME_CONFIG__) {
     const value = window.__RUNTIME_CONFIG__[key];
     if (value !== undefined && value !== "") {
@@ -20,7 +32,7 @@ export function getRuntimeConfig(key: string): string | undefined {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const envValue = (import.meta.env as any)[key];
+  const envValue = (import.meta.env as any)?.[key];
 
   if (key === "VITE_ORDERLY_BROKER_ID" && (!envValue || envValue === "")) {
     return "demo";

@@ -80,12 +80,15 @@ function loadConfig(): Config {
 
   try {
     const configText = readFileSync(configPath, "utf-8");
-    const jsonText = configText
-      .replace(/window\.__RUNTIME_CONFIG__\s*=\s*/, "")
-      .replace(/;$/, "")
-      .trim();
+    // config.js is a JavaScript object literal (unquoted keys, comments,
+    // trailing commas) — not JSON. Evaluate it the same way the browser does.
+    const sandboxWindow: Record<string, unknown> = {};
+    const evaluate = new Function(
+      "window",
+      `"use strict";\n${configText}\nreturn window.__RUNTIME_CONFIG__ || {};`
+    );
+    const config = evaluate(sandboxWindow) as Config;
 
-    const config = JSON.parse(jsonText) as Config;
     console.log("✓ Loaded config from public/config.js");
     return config;
   } catch (error) {

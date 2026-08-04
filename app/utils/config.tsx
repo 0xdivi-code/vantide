@@ -27,6 +27,7 @@ import {
   getRuntimeConfigBoolean,
   getRuntimeConfigNumber,
 } from "./runtime-config";
+import { useConfigVersion } from "@/admin/useConfigVersion";
 import { Link } from "react-router-dom";
 import CustomLeftNav from "@/components/CustomLeftNav";
 
@@ -252,6 +253,7 @@ const getColorConfig = (): ColorConfigInterface | undefined => {
 export const useOrderlyConfig = () => {
   const { t } = useTranslation();
   const { isMobile } = useScreen();
+  const configVersion = useConfigVersion();
 
   return useMemo<OrderlyConfig>(() => {
     const enabledMenus = getEnabledMenus();
@@ -263,6 +265,22 @@ export const useOrderlyConfig = () => {
     }));
 
     const allMenuItems = [...translatedEnabledMenus, ...customMenus];
+
+    // Admin panel logo overrides (uploaded images are stored as data URLs).
+    const customPrimaryLogo = getRuntimeConfig("VITE_CUSTOM_LOGO_URL");
+    const customSecondaryLogo = getRuntimeConfig(
+      "VITE_CUSTOM_SECONDARY_LOGO_URL"
+    );
+    const primaryLogoSrc =
+      customPrimaryLogo || withBasePath("/logo.webp");
+    const secondaryLogoSrc =
+      customSecondaryLogo || withBasePath("/logo-secondary.webp");
+    const hasPrimaryLogo =
+      Boolean(customPrimaryLogo) ||
+      getRuntimeConfigBoolean("VITE_HAS_PRIMARY_LOGO");
+    const hasSecondaryLogo =
+      Boolean(customSecondaryLogo) ||
+      getRuntimeConfigBoolean("VITE_HAS_SECONDARY_LOGO");
 
     const supportedBottomNavMenus = [
       "Trading",
@@ -318,10 +336,9 @@ export const useOrderlyConfig = () => {
               />
             )}
             <Link to="/">
-              {isMobile &&
-              getRuntimeConfigBoolean("VITE_HAS_SECONDARY_LOGO") ? (
+              {isMobile && hasSecondaryLogo ? (
                 <img
-                  src={withBasePath("/logo-secondary.webp")}
+                  src={secondaryLogoSrc}
                   alt="logo"
                   style={{ height: "32px" }}
                 />
@@ -371,11 +388,11 @@ export const useOrderlyConfig = () => {
       },
       orderlyAppProvider: {
         appIcons: {
-          main: getRuntimeConfigBoolean("VITE_HAS_PRIMARY_LOGO")
+          main: hasPrimaryLogo
             ? {
                 component: (
                   <img
-                    src={withBasePath("/logo.webp")}
+                    src={primaryLogoSrc}
                     alt="logo"
                     style={{ height: "42px" }}
                   />
@@ -383,8 +400,8 @@ export const useOrderlyConfig = () => {
               }
             : { img: withBasePath("/orderly-logo.svg") },
           secondary: {
-            img: getRuntimeConfigBoolean("VITE_HAS_SECONDARY_LOGO")
-              ? withBasePath("/logo-secondary.webp")
+            img: hasSecondaryLogo
+              ? secondaryLogoSrc
               : withBasePath("/orderly-logo-secondary.svg"),
           },
         },
@@ -412,5 +429,7 @@ export const useOrderlyConfig = () => {
         },
       },
     };
-  }, [t, isMobile]);
+    // configVersion intentionally re-computes the config when admin overrides change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t, isMobile, configVersion]);
 };
