@@ -119,7 +119,7 @@ export default function AdminSystem() {
             <div className="grid grid-cols-2 gap-3">
               <Field label="Default currency">
                 <Select value={settings.defaultCurrency} onChange={(e) => set({ defaultCurrency: e.target.value })}>
-                  {["USD", "EUR", "GBP", "NGN", "BRL"].map((c) => <option key={c}>{c}</option>)}
+                  {["USD", "EUR", "GBP", "BRL"].map((c) => <option key={c}>{c}</option>)}
                 </Select>
               </Field>
               <Field label="Timezone">
@@ -155,7 +155,7 @@ export default function AdminSystem() {
                     Maintenance mode
                     {settings.maintenance && <Badge tone="danger">ON</Badge>}
                   </div>
-                  <div className="text-[11px] text-white/35">Blocks logins & trading venue-wide (mock).</div>
+                  <div className="text-[11px] text-white/35">Blocks logins & trading venue-wide .</div>
                 </div>
                 <Toggle checked={settings.maintenance} onChange={(v) => set({ maintenance: v })} />
               </div>

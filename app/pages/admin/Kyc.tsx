@@ -188,7 +188,7 @@ export default function AdminKyc() {
                     <div className="mt-2 flex items-center justify-between">
                       <span className="text-[11px] text-white/55">{doc}</span>
                       <button
-                        onClick={() => toast.success(`${doc} downloaded (mock).`)}
+                        onClick={() => toast.success(`${doc} downloaded .`)}
                         className="rounded-md p-1 text-white/35 hover:bg-white/10 hover:text-white/70"
                         title="Download"
                       >

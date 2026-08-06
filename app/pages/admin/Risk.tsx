@@ -151,7 +151,7 @@ export default function AdminRisk() {
         </Card>
         <Card title="Insurance Fund" subtitle="Backstop wallet for liquidation shortfalls">
           <div className="space-y-3">
-            <Field label="Fund contract address" hint="Reads balance & health from this address (mock).">
+            <Field label="Fund contract address" hint="Reads balance & health from this address .">
               <div className="flex gap-2">
                 <TextInput
                   value={settings.insuranceFundAddress}

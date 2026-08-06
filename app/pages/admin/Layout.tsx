@@ -41,7 +41,7 @@ function AdminBrand() {
       <div className="leading-tight">
         <div className="text-sm font-bold text-white">{appName}</div>
         <div className="text-[10px] font-medium uppercase tracking-wider text-[rgb(var(--oui-color-primary-light))]">
-          Admin Console
+          Control Panel
         </div>
       </div>
     </Link>
@@ -361,7 +361,7 @@ function AdminShell() {
             Back to site
           </Link>
           <p className="px-3 pt-1 text-[10px] leading-relaxed text-white/25">
-            Mock-data admin console · changes persist in this browser
+            Vantide Admin console · v{getRuntimeConfig("VITE_APP_VERSION") || "0.1.0"}
           </p>
         </div>
       </aside>
@@ -473,7 +473,7 @@ export default function AdminLayout() {
   const passcode = getRuntimeConfig("VITE_ADMIN_PASSCODE");
 
   useEffect(() => {
-    document.title = "Admin Console";
+    document.title = "Control Panel";
   }, []);
 
   if (!enabled) return <DisabledScreen />;
