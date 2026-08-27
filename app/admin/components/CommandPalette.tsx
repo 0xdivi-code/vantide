@@ -1,50 +1,27 @@
-/** ⌘K global search across pages, users, pairs, tickets, orders, wallets, admins, settings. */
+/** ⌘K navigation and live-market search for the admin console. */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
-  Search,
-  Users,
-  Coins,
-  Headset,
-  FileText,
-  Vault,
-  ShieldCheck,
-  Settings,
   ArrowRight,
-  Clock,
+  Coins,
+  Search,
+  Settings,
+  WifiOff,
+  type LucideIcon,
 } from "lucide-react";
-import { db } from "@/admin/mock/db";
+import { useFrontendMarketSnapshot } from "@/admin/api/orderly";
 import { ALL_NAV_ITEMS } from "@/admin/nav";
 import { CONFIG_FIELDS } from "@/admin/fields";
-import { shortHash } from "@/admin/mock/rng";
 
 interface Result {
   id: string;
   group: string;
-  icon: React.ComponentType<{ size?: number | string; className?: string }>;
+  icon: LucideIcon;
   title: string;
   subtitle?: string;
   to: string;
-}
-
-const RECENT_KEY = "vantide-admin-recent-searches";
-
-function loadRecent(): Result[] {
-  try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveRecent(results: Result[]) {
-  try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(results.slice(0, 5)));
-  } catch {
-    /* ignore */
-  }
 }
 
 export function CommandPalette({
@@ -58,105 +35,83 @@ export function CommandPalette({
   const inputRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
-  const [recent, setRecent] = useState<Result[]>([]);
+  const marketQuery = useFrontendMarketSnapshot({ enabled: open });
 
   useEffect(() => {
     if (open) {
       setQ("");
       setActive(0);
-      setRecent(loadRecent());
       setTimeout(() => inputRef.current?.focus(), 30);
     }
   }, [open]);
 
   const results = useMemo((): Result[] => {
     const query = q.trim().toLowerCase();
-    if (!query) return recent;
-
     const out: Result[] = [];
-    const push = (r: Result) => {
-      if (out.length < 40) out.push(r);
+    const push = (result: Result) => {
+      if (out.length < 40) out.push(result);
     };
 
-    // pages
+    // Navigation remains useful before the live market request completes.
     for (const item of ALL_NAV_ITEMS) {
-      const hay = `${item.label} ${item.keywords}`.toLowerCase();
-      if (hay.includes(query)) {
-        push({ id: `page-${item.to}`, group: "Pages", icon: item.icon, title: item.label, subtitle: "Go to page", to: item.to });
+      const haystack = `${item.label} ${item.keywords}`.toLowerCase();
+      if (!query || haystack.includes(query)) {
+        push({
+          id: `page-${item.to}`,
+          group: "Pages",
+          icon: item.icon,
+          title: item.label,
+          subtitle: "Open page",
+          to: item.to,
+        });
       }
     }
-    // users
-    for (const u of db.users.all()) {
-      if (out.filter((x) => x.group === "Users").length >= 4) break;
-      const hay = `${u.wallet} ${u.email} ${u.id} ${u.country}`.toLowerCase();
-      if (hay.includes(query)) {
-        push({ id: `user-${u.id}`, group: "Users", icon: Users, title: u.email, subtitle: `${shortHash(u.wallet)} · ${u.country}`, to: `/admin/users/${u.id}` });
+
+    if (!query) return out.slice(0, 10);
+
+    for (const market of marketQuery.data?.markets ?? []) {
+      const haystack = `${market.symbol} ${market.displayName} ${market.base} ${market.quote}`.toLowerCase();
+      if (haystack.includes(query)) {
+        push({
+          id: `market-${market.symbol}`,
+          group: "Live markets",
+          icon: Coins,
+          title: `${market.displayName}/${market.quote}`,
+          subtitle: market.symbol,
+          to: `/admin/pairs?q=${encodeURIComponent(market.symbol)}`,
+        });
       }
     }
-    // pairs
-    for (const p of db.pairs.all()) {
-      if (out.filter((x) => x.group === "Trading pairs").length >= 5) break;
-      if (p.symbol.toLowerCase().includes(query)) {
-        push({ id: `pair-${p.id}`, group: "Trading pairs", icon: Coins, title: p.symbol, subtitle: `${p.chain} · ${p.status}`, to: `/admin/pairs?q=${encodeURIComponent(p.symbol)}` });
-      }
-    }
-    // tickets
-    for (const t of db.tickets.all()) {
-      if (out.filter((x) => x.group === "Support tickets").length >= 3) break;
-      const hay = `${t.id} ${t.subject} ${t.category}`.toLowerCase();
-      if (hay.includes(query)) {
-        push({ id: `ticket-${t.id}`, group: "Support tickets", icon: Headset, title: t.subject, subtitle: `${t.id} · ${t.status}`, to: `/admin/support` });
-      }
-    }
-    // orders & trades
-    for (const o of db.orders.all()) {
-      if (out.filter((x) => x.group === "Orders").length >= 3) break;
-      if (o.id.toLowerCase().includes(query)) {
-        push({ id: `order-${o.id}`, group: "Orders", icon: FileText, title: o.id, subtitle: `${o.pair} ${o.side} · ${o.status}`, to: `/admin/users/${o.user}` });
-      }
-    }
-    // treasury wallets
-    for (const w of db.wallets.all()) {
-      const hay = `${w.name} ${w.address}`.toLowerCase();
-      if (hay.includes(query)) {
-        push({ id: `wallet-${w.id}`, group: "Treasury", icon: Vault, title: w.name, subtitle: shortHash(w.address), to: "/admin/treasury" });
-      }
-    }
-    // admins
-    for (const a of db.admins.all()) {
-      const hay = `${a.name} ${a.email} ${a.role}`.toLowerCase();
-      if (hay.includes(query)) {
-        push({ id: `admin-${a.id}`, group: "Admins", icon: ShieldCheck, title: a.name, subtitle: a.role, to: "/admin/security" });
-      }
-    }
-    // settings keys
-    for (const f of CONFIG_FIELDS) {
-      if (out.filter((x) => x.group === "Settings").length >= 3) break;
-      const hay = `${f.key} ${f.label}`.toLowerCase();
-      if (hay.includes(query)) {
-        push({ id: `setting-${f.key}`, group: "Settings", icon: Settings, title: f.label, subtitle: f.key, to: "/admin/settings" });
+
+    for (const field of CONFIG_FIELDS) {
+      const haystack = `${field.key} ${field.label} ${field.description || ""}`.toLowerCase();
+      if (haystack.includes(query)) {
+        push({
+          id: `setting-${field.key}`,
+          group: "Settings",
+          icon: Settings,
+          title: field.label,
+          subtitle: field.key,
+          to: "/admin/settings",
+        });
       }
     }
     return out;
-  }, [q, recent]);
+  }, [marketQuery.data?.markets, q]);
 
-  useEffect(() => setActive(0), [results.length]);
+  useEffect(() => setActive(0), [results.length, q]);
 
-  const go = (r: Result) => {
-    const next = [r, ...recent.filter((x) => x.id !== r.id)].slice(0, 5);
-    // serialize without component refs
-    saveRecent(next.map((x) => ({ ...x, icon: Search })));
+  const go = (result: Result) => {
     onClose();
-    navigate(r.to);
+    navigate(result.to);
   };
 
   if (!open || typeof document === "undefined") return null;
 
-  const groups = results.reduce<Record<string, Result[]>>((acc, r) => {
-    (acc[r.group] = acc[r.group] || []).push(r);
-    return acc;
+  const groups = results.reduce<Record<string, Result[]>>((accumulator, result) => {
+    (accumulator[result.group] = accumulator[result.group] || []).push(result);
+    return accumulator;
   }, {});
-  const flat = results;
 
   return createPortal(
     <div className="fixed inset-0 z-[999] flex items-start justify-center px-4 pt-[12vh]">
@@ -173,61 +128,53 @@ export function CommandPalette({
           <input
             ref={inputRef}
             value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "ArrowDown") {
-                e.preventDefault();
-                setActive((a) => Math.min(flat.length - 1, a + 1));
-              } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setActive((a) => Math.max(0, a - 1));
-              } else if (e.key === "Enter" && flat[active]) {
-                go(flat[active]);
-              } else if (e.key === "Escape") {
+            onChange={(event) => setQ(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowDown" && results.length > 0) {
+                event.preventDefault();
+                setActive((current) => Math.min(results.length - 1, current + 1));
+              } else if (event.key === "ArrowUp" && results.length > 0) {
+                event.preventDefault();
+                setActive((current) => Math.max(0, current - 1));
+              } else if (event.key === "Enter" && results[active]) {
+                go(results[active]);
+              } else if (event.key === "Escape") {
                 onClose();
               }
             }}
-            placeholder="Search users, pairs, orders, wallets, settings…"
+            placeholder="Search pages, live markets, settings…"
             className="w-full bg-transparent py-3.5 text-sm text-white placeholder-white/30 outline-none"
           />
-          <kbd className="shrink-0 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/40">
-            ESC
-          </kbd>
+          <kbd className="shrink-0 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/40">ESC</kbd>
         </div>
         <div className="max-h-[52vh] overflow-y-auto p-2">
-          {flat.length === 0 ? (
-            <p className="py-10 text-center text-sm text-white/35">
-              No results for “{q}”
-            </p>
+          {marketQuery.error && q && (
+            <div className="mx-2 mb-2 flex items-center gap-2 rounded-lg bg-white/[0.04] px-3 py-2 text-[11px] text-white/40">
+              <WifiOff size={12} /> Live market matches are unavailable right now.
+            </div>
+          )}
+          {results.length === 0 ? (
+            <p className="py-10 text-center text-sm text-white/35">No results for “{q}”</p>
           ) : (
-            Object.entries(groups).map(([group, items]) => (
+            Object.entries(groups).map(([group, groupResults]) => (
               <div key={group} className="mb-1">
-                <div className="flex items-center gap-1.5 px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-white/30">
-                  {group === "Recent" && <Clock size={10} />}
-                  {group}
-                </div>
-                {items.map((r) => {
-                  const idx = flat.indexOf(r);
-                  const IconCmp = r.icon;
+                <div className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-white/30">{group}</div>
+                {groupResults.map((result) => {
+                  const index = results.indexOf(result);
+                  const Icon = result.icon;
                   return (
                     <button
-                      key={r.id}
-                      onMouseEnter={() => setActive(idx)}
-                      onClick={() => go(r)}
-                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left ${
-                        idx === active ? "bg-[rgba(var(--oui-color-primary),0.16)]" : ""
-                      }`}
+                      key={result.id}
+                      onMouseEnter={() => setActive(index)}
+                      onClick={() => go(result)}
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left ${index === active ? "bg-[rgba(var(--oui-color-primary),0.16)]" : ""}`}
                     >
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/50">
-                        <IconCmp size={14} />
-                      </span>
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/50"><Icon size={14} /></span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm text-white/85">{r.title}</span>
-                        {r.subtitle && (
-                          <span className="block truncate text-[11px] text-white/35">{r.subtitle}</span>
-                        )}
+                        <span className="block truncate text-sm text-white/85">{result.title}</span>
+                        {result.subtitle && <span className="block truncate text-[11px] text-white/35">{result.subtitle}</span>}
                       </span>
-                      {idx === active && <ArrowRight size={13} className="shrink-0 text-white/40" />}
+                      {index === active && <ArrowRight size={13} className="shrink-0 text-white/40" />}
                     </button>
                   );
                 })}
@@ -236,9 +183,7 @@ export function CommandPalette({
           )}
         </div>
         <div className="flex items-center gap-4 border-t border-white/5 px-4 py-2 text-[10px] text-white/30">
-          <span>↑↓ navigate</span>
-          <span>↵ open</span>
-          <span>esc close</span>
+          <span>↑↓ navigate</span><span>↵ open</span><span>esc close</span>
         </div>
       </div>
     </div>,

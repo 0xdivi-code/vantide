@@ -151,6 +151,24 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
       "Controls the local page-view tracker shown in the Analytics tab.",
   },
   {
+    key: "VITE_ADMIN_API_URL",
+    label: "Admin API URL",
+    group: "Admin Panel",
+    type: "url",
+    placeholder: "/api/admin",
+    description:
+      "Optional authorized backend for private users, treasury, compliance, support, and operations data. Prefer a same-origin path; never put an API secret in this setting.",
+  },
+  {
+    key: "VITE_ADMIN_LIVE_REFRESH_MS",
+    label: "Live market refresh (ms)",
+    group: "Admin Panel",
+    type: "text",
+    placeholder: "15000",
+    description:
+      "Polling interval for public market telemetry. Values are safety-clamped between 5 seconds and 5 minutes.",
+  },
+  {
     key: "VITE_ADMIN_PASSCODE",
     label: "Admin passcode",
     group: "Admin Panel",
@@ -170,6 +188,24 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
     ],
     description:
       'Set to "false" and export config.js to hide the admin panel in production.',
+  },
+  {
+    key: "VITE_ORDERLY_API_URL",
+    label: "Orderly API URL override",
+    group: "Advanced",
+    type: "url",
+    placeholder: "https://api.orderly.org",
+    description:
+      "Optional API/proxy override for the live admin market queries. Leave empty to follow the frontend's selected Orderly network.",
+  },
+  {
+    key: "VITE_SYMBOL_LIST",
+    label: "Frontend market symbols",
+    group: "Advanced",
+    type: "textarea",
+    placeholder: "PERP_BTC_USDC,PERP_ETH_USDC",
+    description:
+      "Comma-separated symbols exposed by the trading frontend. Live admin market views use this exact list when it is set.",
   },
   {
     key: "VITE_ANALYTICS_SCRIPT",

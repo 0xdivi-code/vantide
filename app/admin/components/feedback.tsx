@@ -347,7 +347,7 @@ export function CardsSkeleton({ n = 4 }: { n?: number }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Error state + simulated loading hook                               */
+/* Error state                                                       */
 /* ------------------------------------------------------------------ */
 
 export function ErrorState({
@@ -373,17 +373,4 @@ export function ErrorState({
       )}
     </div>
   );
-}
-
-/**  const ref = useRef(false);
- * Simulated mock-API loading: returns true for `ms` on first mount.
- * Gives tables/pages their skeleton phase, like a real backend fetch.
- */
-export function useMockLoading(ms = 350): boolean {
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), ms);
-    return () => clearTimeout(t);
-  }, [ms]);
-  return loading;
 }

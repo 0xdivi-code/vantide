@@ -1,291 +1,319 @@
-import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  ArrowDownLeft,
-  ArrowDownUp,
-  ArrowUpRight,
-  Coins,
-  Flame,
-  Landmark,
-  TrendingUp,
-  UserPlus,
-  Users,
   Activity,
-  Receipt,
-  Percent,
-  Package,
-  BellRing,
-  CircleDot,
+  BarChart3,
+  Coins,
+  Gauge,
+  Landmark,
+  Radio,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+  Waves,
 } from "lucide-react";
-import { db } from "@/admin/mock/db";
-import { buildAnalytics, nextActivity, USER_TOTAL, TRADE_TOTAL } from "@/admin/mock/data";
-import { fmtNum, fmtUsd, timeAgo } from "@/admin/mock/rng";
-import type { ActivityEvent } from "@/admin/mock/types";
-import { Card, Badge, AdminButton, PageHeader } from "@/admin/components/ui";
-import { AreaChart, BarChart, RankedBars, Sparkline } from "@/admin/components/Charts";
-import { Skeleton, useMockLoading } from "@/admin/components/feedback";
-import { useMockApiVersion } from "@/admin/mock/api";
+import { useFrontendMarketSnapshot, type FrontendMarket } from "@/admin/api/orderly";
+import {
+  formatAge,
+  formatNumber,
+  formatPercent,
+  formatUsd,
+} from "@/admin/data/format";
+import { Badge, AdminButton, Card, PageHeader, StatCard } from "@/admin/components/ui";
+import { DataTable, type Column } from "@/admin/components/DataTable";
+import {
+  EmptyDataState,
+  LiveDataBar,
+  LoadingDataState,
+  QueryErrorState,
+} from "@/admin/components/LiveDataState";
+import { RankedBars } from "@/admin/components/Charts";
 
-function Kpi({
-  icon: IconCmp,
-  label,
-  value,
-  delta,
-  spark,
-  tone = "primary",
-}: {
-  icon: React.ComponentType<{ size?: number | string }>;
-  label: string;
-  value: string;
-  delta?: string;
-  spark?: number[];
-  tone?: "primary" | "success" | "danger" | "warning";
-}) {
-  const tones = {
-    primary: "bg-[rgba(var(--oui-color-primary),0.15)] text-[rgb(var(--oui-color-primary-light))]",
-    success: "bg-[rgba(var(--oui-color-success),0.15)] text-[rgb(var(--oui-color-success))]",
-    danger: "bg-[rgba(var(--oui-color-danger),0.15)] text-[rgb(var(--oui-color-danger-light))]",
-    warning: "bg-[rgba(var(--oui-color-warning),0.15)] text-[rgb(var(--oui-color-warning))]",
-  };
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-[rgb(var(--oui-color-base-8))] px-4 py-3.5">
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${tones[tone]}`}>
-        <IconCmp size={18} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[11px] text-white/40">{label}</div>
-        <div className="truncate text-lg font-bold leading-tight text-white">{value}</div>
-        {delta && <div className="text-[10px] text-[rgb(var(--oui-color-success))]">{delta}</div>}
-      </div>
-      {spark && (
-        <Sparkline
-          data={spark}
-          width={72}
-          height={26}
-          color={tone === "danger" ? "rgb(var(--oui-color-danger))" : "rgb(var(--oui-color-primary))"}
-        />
-      )}
-    </div>
-  );
+function marketLabel(market: FrontendMarket): string {
+  return `${market.displayName}/${market.quote}`;
 }
 
-const ACTIVITY_ICON: Record<ActivityEvent["kind"], { icon: React.ComponentType<{ size?: number | string }>; cls: string }> = {
-  new_user: { icon: UserPlus, cls: "bg-[rgba(var(--oui-color-primary),0.15)] text-[rgb(var(--oui-color-primary-light))]" },
-  new_position: { icon: TrendingUp, cls: "bg-[rgba(var(--oui-color-success),0.15)] text-[rgb(var(--oui-color-success))]" },
-  liquidation: { icon: Flame, cls: "bg-[rgba(var(--oui-color-danger),0.15)] text-[rgb(var(--oui-color-danger-light))]" },
-  deposit: { icon: ArrowDownLeft, cls: "bg-[rgba(var(--oui-color-success),0.15)] text-[rgb(var(--oui-color-success))]" },
-  withdrawal: { icon: ArrowUpRight, cls: "bg-[rgba(var(--oui-color-warning),0.15)] text-[rgb(var(--oui-color-warning))]" },
-  alert: { icon: BellRing, cls: "bg-[rgba(var(--oui-color-warning),0.15)] text-[rgb(var(--oui-color-warning))]" },
-};
-
 export default function AdminDashboard() {
-  useMockApiVersion();
-  const loading = useMockLoading(500);
-  const [live, setLive] = useState(true);
-  const [events, setEvents] = useState<ActivityEvent[]>(() =>
-    Array.from({ length: 8 }, (_, i) => {
-      const e = nextActivity(i);
-      e.ts = Date.now() - (8 - i) * 70_000;
-      return e;
-    })
-  );
+  const query = useFrontendMarketSnapshot();
+  const snapshot = query.data;
 
-  // Simulated realtime feed (replaces WebSocket in this mock build)
-  useEffect(() => {
-    if (!live) return;
-    let i = 100;
-    const t = setInterval(() => {
-      setEvents((ev) => [nextActivity(i++), ...ev].slice(0, 14));
-    }, 9000);
-    return () => clearInterval(t);
-  }, [live]);
-
-  const analytics = useMemo(() => buildAnalytics(30), []);
-
-  const stats = useMemo(() => {
-    const trades = db.trades.all();
-    const liqs = db.liquidations.all();
-    const dayAgo = Date.now() - 86_400_000;
-    const volume24h = trades.filter((t) => t.ts > dayAgo).reduce((s, t) => s + t.size, 0);
-    const fees24h = trades.filter((t) => t.ts > dayAgo).reduce((s, t) => s + t.fee, 0);
-    const liqsToday = liqs.filter((l) => l.ts > dayAgo);
-    const fundingPaid = db.funding.all().filter((f) => f.ts > dayAgo).reduce((s, f) => s + f.paid, 0);
-    const treasury = db.wallets.all().reduce((s, w) => s + w.balance, 0);
-    const ordersToday = db.orders.all().filter((o) => o.ts > dayAgo).length;
-    const activeTraders = new Set(trades.filter((t) => t.ts > dayAgo).map((t) => t.wallet)).size;
-    return {
-      volume24h: volume24h * 8421, // scale to venue level
-      fees24h: fees24h * 8421,
-      revenue: fees24h * 8421 * 0.42,
-      treasury,
-      liqsTodayCount: liqsToday.length * 37,
-      liqsTodayUsd: liqsToday.reduce((s, l) => s + l.loss, 0) * 37,
-      fundingPaid: fundingPaid * 120,
-      ordersToday: ordersToday * 511,
-      activeTraders: activeTraders * 311,
-      tradesToday: Math.round(TRADE_TOTAL / 365 / 8),
-    };
-  }, []);
-
-  const topPairs = useMemo(() => {
-    const vol = new Map<string, number>();
-    db.trades.all().forEach((t) => vol.set(t.pair, (vol.get(t.pair) || 0) + t.size));
-    return [...vol.entries()]
-      .map(([label, value]) => ({ label, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 7);
-  }, []);
-
-  if (loading) {
+  if (query.isLoading && !snapshot) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-9 w-64" />
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          {Array.from({ length: 10 }).map((_, i) => (
-            <Skeleton key={i} className="h-[74px]" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Skeleton className="h-64" />
-          <Skeleton className="h-64" />
-        </div>
-        <Skeleton className="h-72" />
+      <div className="space-y-5">
+        <PageHeader title="Exchange Overview" description="Loading live data for the markets configured in this frontend." />
+        <LoadingDataState />
       </div>
     );
   }
 
+  if (query.error && !snapshot) {
+    return (
+      <div className="space-y-5">
+        <PageHeader title="Exchange Overview" description="Live market data is fetched from the same Orderly network as the trading frontend." />
+        <QueryErrorState error={query.error} onRetry={() => void query.refetch()} />
+      </div>
+    );
+  }
+
+  if (!snapshot || snapshot.markets.length === 0) {
+    return (
+      <div className="space-y-5">
+        <PageHeader title="Exchange Overview" description="Live market data for the symbols enabled in the frontend." />
+        <LiveDataBar
+          source={snapshot?.source || "Orderly public API"}
+          updatedAt={snapshot?.fetchedAt}
+          refreshing={query.isRefreshing}
+          onRefresh={() => void query.refetch()}
+        />
+        <QueryErrorState error={query.error} onRetry={() => void query.refetch()} compact />
+        <EmptyDataState
+          title="No enabled markets were returned"
+          hint="Check VITE_SYMBOL_LIST and the selected Orderly network. The dashboard intentionally does not substitute demo market records."
+          action={
+            <Link to="/admin/settings">
+              <AdminButton>Open frontend settings</AdminButton>
+            </Link>
+          }
+        />
+      </div>
+    );
+  }
+
+  const activeMarkets = snapshot.markets.filter((market) => market.status === "active");
+  const topVolume = snapshot.markets[0];
+  const topOpenInterest = [...snapshot.markets].sort(
+    (left, right) => right.openInterest - left.openInterest
+  )[0];
+  const fundingMarkets = snapshot.markets.filter(
+    (market) => market.estimatedFundingRate !== null
+  );
+  const averageFunding = fundingMarkets.length
+    ? fundingMarkets.reduce(
+        (sum, market) => sum + (market.estimatedFundingRate ?? 0),
+        0
+      ) / fundingMarkets.length
+    : null;
+  const marketColumns: Column<FrontendMarket>[] = [
+    {
+      key: "market",
+      label: "Market",
+      sortValue: (market) => market.symbol,
+      render: (market) => (
+        <div>
+          <div className="font-medium text-white">{marketLabel(market)}</div>
+          <div className="font-mono text-[10px] text-white/30">{market.symbol}</div>
+        </div>
+      ),
+      csvValue: (market) => market.symbol,
+    },
+    {
+      key: "mark",
+      label: "Mark price",
+      align: "right",
+      sortValue: (market) => market.markPrice,
+      render: (market) => formatUsd(market.markPrice, false),
+      csvValue: (market) => String(market.markPrice),
+    },
+    {
+      key: "change",
+      label: "24h",
+      align: "right",
+      sortValue: (market) => market.change24h ?? 0,
+      render: (market) => {
+        const positive = (market.change24h ?? 0) >= 0;
+        return (
+          <span className={positive ? "text-[rgb(var(--oui-color-success))]" : "text-[rgb(var(--oui-color-danger-light))]"}>
+            {formatPercent(market.change24h, { signed: true })}
+          </span>
+        );
+      },
+      csvValue: (market) => String(market.change24h ?? ""),
+    },
+    {
+      key: "volume",
+      label: "24h notional",
+      align: "right",
+      sortValue: (market) => market.volume24h,
+      render: (market) => formatUsd(market.volume24h),
+      csvValue: (market) => String(market.volume24h),
+    },
+    {
+      key: "open-interest",
+      label: "Open interest",
+      align: "right",
+      sortValue: (market) => market.openInterest,
+      render: (market) => formatNumber(market.openInterest),
+      csvValue: (market) => String(market.openInterest),
+    },
+    {
+      key: "funding",
+      label: "Est. funding",
+      align: "right",
+      sortValue: (market) => market.estimatedFundingRate ?? 0,
+      render: (market) => formatPercent(market.estimatedFundingRate, { fraction: true, signed: true, digits: 4 }),
+      csvValue: (market) => String(market.estimatedFundingRate ?? ""),
+    },
+    {
+      key: "status",
+      label: "Status",
+      sortValue: (market) => market.status,
+      render: (market) => (
+        <Badge tone={market.status === "active" ? "success" : "warning"}>{market.status}</Badge>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title="Exchange Overview"
-        description="Venue-wide metrics. Mock data — refreshed a few seconds ago."
+        description="Live market telemetry for the same symbols and network used by the trading frontend. Refreshes automatically without locally generated demo records."
         actions={
-          <>
-            <Link to="/admin/pairs?new=1">
-              <AdminButton variant="primary">
-                <Coins size={15} /> New pair
-              </AdminButton>
-            </Link>
-            <Link to="/admin/notifications">
-              <AdminButton>
-                <BellRing size={15} /> Broadcast
-              </AdminButton>
-            </Link>
-          </>
+          <Link to="/admin/pairs">
+            <AdminButton variant="primary">
+              <Coins size={15} /> View live markets
+            </AdminButton>
+          </Link>
         }
       />
+      <LiveDataBar
+        source={snapshot.source}
+        updatedAt={snapshot.fetchedAt}
+        refreshing={query.isRefreshing}
+        onRefresh={() => void query.refetch()}
+      />
+      <QueryErrorState error={query.error} onRetry={() => void query.refetch()} compact />
 
-      {/* KPI grid */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        <Kpi icon={Activity} label="Daily Volume" value={fmtUsd(stats.volume24h)} delta="+12.4% vs yesterday" spark={analytics.volume.slice(-14)} />
-        <Kpi icon={Landmark} label="Treasury Balance" value={fmtUsd(stats.treasury)} tone="success" delta="+3.1% this week" />
-        <Kpi icon={Receipt} label="Platform Revenue (24h)" value={fmtUsd(stats.revenue)} delta="+8.9%" spark={analytics.revenue.slice(-14)} />
-        <Kpi icon={Users} label="Total Users" value={fmtNum(USER_TOTAL)} delta="+412 today" spark={analytics.users.slice(-14)} />
-        <Kpi icon={TrendingUp} label="Active Traders (24h)" value={fmtNum(stats.activeTraders)} tone="warning" />
-        <Kpi icon={Package} label="Orders Today" value={fmtNum(stats.ordersToday)} />
-        <Kpi icon={ArrowDownUp} label="Trades Today" value={fmtNum(stats.tradesToday)} spark={analytics.trades.slice(-14)} />
-        <Kpi icon={Flame} label="Liquidations Today" value={`${fmtNum(stats.liqsTodayCount)} · ${fmtUsd(stats.liqsTodayUsd)}`} tone="danger" />
-        <Kpi icon={Percent} label="Funding Paid (24h)" value={fmtUsd(stats.fundingPaid)} />
-        <Kpi icon={Coins} label="Fees Generated (24h)" value={fmtUsd(stats.fees24h)} delta="+6.2%" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
+        <StatCard
+          icon={BarChart3}
+          label="24h market notional"
+          value={formatUsd(snapshot.total24hVolume)}
+          hint={`${formatNumber(snapshot.markets.length, false)} frontend markets`}
+        />
+        <StatCard
+          icon={Landmark}
+          label="Reported total OI"
+          value={formatNumber(snapshot.totalOpenInterest)}
+          hint="Aggregate returned by the market feed"
+          accent="success"
+        />
+        <StatCard
+          icon={Activity}
+          label="Active markets"
+          value={`${activeMarkets.length}/${snapshot.markets.length}`}
+          hint={activeMarkets.length === snapshot.markets.length ? "All returned as active" : "Review non-active symbols"}
+          accent={activeMarkets.length === snapshot.markets.length ? "success" : "warning"}
+        />
+        <StatCard
+          icon={Coins}
+          label="Highest 24h volume"
+          value={topVolume ? marketLabel(topVolume) : "—"}
+          hint={topVolume ? formatUsd(topVolume.volume24h) : undefined}
+          accent="primary"
+        />
+        <StatCard
+          icon={Waves}
+          label="Average est. funding"
+          value={formatPercent(averageFunding, { fraction: true, signed: true, digits: 4 })}
+          hint={`${fundingMarkets.length} market${fundingMarkets.length === 1 ? "" : "s"} reporting`}
+          accent="warning"
+        />
       </div>
 
-      {/* Main charts */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <Card title="Volume" subtitle="Last 30 days" className="xl:col-span-2">
-          <AreaChart
-            labels={analytics.labels}
-            data={analytics.volume}
-            formatValue={(v) => fmtUsd(v)}
-          />
-        </Card>
-        <Card title="Trading Pair Volume" subtitle="Top markets (30d)">
-          <RankedBars items={topPairs} formatValue={(v) => fmtUsd(v)} />
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card title="User Growth" subtitle="New signups / day">
-          <AreaChart labels={analytics.labels} data={analytics.users} height={140} formatValue={(v) => `${fmtNum(v)} users`} />
-        </Card>
-        <Card title="Revenue" subtitle="Fees captured / day">
-          <AreaChart labels={analytics.labels} data={analytics.revenue} height={140} color="rgb(var(--oui-color-success))" formatValue={(v) => fmtUsd(v)} />
-        </Card>
-        <Card title="Open Interest" subtitle="Venue-wide">
-          <AreaChart labels={analytics.labels} data={analytics.openInterest} height={140} color="rgb(var(--oui-color-warning))" formatValue={(v) => fmtUsd(v)} />
-        </Card>
-        <Card title="Liquidations" subtitle="$ liquidated / day">
-          <BarChart labels={analytics.labels} data={analytics.liquidations} height={140} color="rgb(var(--oui-color-danger))" formatValue={(v) => fmtUsd(v)} />
-        </Card>
-      </div>
-
-      {/* Activity feed + quick links */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card
-          title="Live Activity"
-          subtitle="New users, positions, liquidations, deposits, withdrawals & alerts"
+          title="24h volume by market"
+          subtitle="Real quote notional returned by the live market feed"
           className="xl:col-span-2"
-          actions={
-            <button
-              onClick={() => setLive((l) => !l)}
-              className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white/80"
-            >
-              <CircleDot size={12} className={`admin-live-dot ${live ? "text-[rgb(var(--oui-color-success))]" : "text-white/30"}`} />
-              {live ? "Live" : "Paused"}
-            </button>
-          }
         >
-          <ul className="divide-y divide-white/5">
-            {events.map((e) => {
-              const meta = ACTIVITY_ICON[e.kind];
-              return (
-                <li key={e.id} className="flex items-center gap-3 py-2.5">
-                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${meta.cls}`}>
-                    <meta.icon size={14} />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-white/75">{e.text}</span>
-                  {e.amount !== undefined && (
-                    <span className="shrink-0 text-sm font-medium text-white/85">{fmtUsd(e.amount)}</span>
-                  )}
-                  <span className="w-16 shrink-0 text-right text-[11px] text-white/30">{timeAgo(e.ts)}</span>
-                </li>
-              );
-            })}
-          </ul>
+          <RankedBars
+            items={snapshot.markets.slice(0, 10).map((market) => ({
+              label: marketLabel(market),
+              value: market.volume24h,
+            }))}
+            formatValue={(value) => formatUsd(value)}
+          />
         </Card>
-
-        <Card title="Quick Actions" subtitle="Jump straight into a workflow">
-          <div className="grid grid-cols-2 gap-2.5">
-            {[
-              { to: "/admin/pairs?new=1", label: "List new pair", icon: Coins },
-              { to: "/admin/users", label: "Manage users", icon: Users },
-              { to: "/admin/funding", label: "Approvals", icon: ArrowDownUp },
-              { to: "/admin/kyc", label: "KYC queue", icon: BellRing },
-              { to: "/admin/treasury", label: "Treasury", icon: Landmark },
-              { to: "/admin/notifications", label: "Notify users", icon: Receipt },
-            ].map((a) => (
-              <Link key={a.label} to={a.to}>
-                <div className="flex h-full flex-col items-start gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 transition-colors hover:border-[rgba(var(--oui-color-primary),0.5)] hover:bg-[rgba(var(--oui-color-primary),0.08)]">
-                  <a.icon size={16} className="text-[rgb(var(--oui-color-primary-light))]" />
-                  <span className="text-xs font-medium text-white/80">{a.label}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-          <div className="mt-3 rounded-lg bg-white/5 px-3 py-2.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-white/50">System status</span>
-              <Badge tone="success">All systems operational</Badge>
+        <Card title="Live market pulse" subtitle="Calculated from the latest frontend market snapshot">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between rounded-lg bg-white/[0.04] px-3 py-2.5 text-sm">
+              <span className="flex items-center gap-2 text-white/55">
+                <Radio size={14} className="admin-live-dot text-[rgb(var(--oui-color-success))]" /> Feed status
+              </span>
+              <Badge tone={query.error ? "warning" : "success"}>{query.error ? "Last snapshot" : "Connected"}</Badge>
             </div>
-            <div className="mt-2 flex items-center justify-between text-xs">
-              <span className="text-white/50">Pending approvals</span>
+            <div className="flex items-center justify-between border-b border-white/5 pb-2 text-sm">
+              <span className="text-white/45">Largest open interest</span>
+              <span className="font-medium text-white">{topOpenInterest ? marketLabel(topOpenInterest) : "—"}</span>
+            </div>
+            <div className="flex items-center justify-between border-b border-white/5 pb-2 text-sm">
+              <span className="text-white/45">Open interest value</span>
+              <span className="font-medium text-white">{topOpenInterest ? formatNumber(topOpenInterest.openInterest) : "—"}</span>
+            </div>
+            <div className="flex items-center justify-between border-b border-white/5 pb-2 text-sm">
+              <span className="text-white/45">Configured symbols</span>
               <span className="font-medium text-white">
-                {db.withdrawals.all().filter((w) => w.status === "pending").length} withdrawals ·{" "}
-                {db.transfers.all().filter((t) => t.status === "pending").length} transfers ·{" "}
-                {db.kyc.all().filter((k) => k.status === "pending").length} KYC
+                {snapshot.configuredSymbolCount > 0 ? snapshot.configuredSymbolCount : "All available"}
               </span>
             </div>
+            <p className="pt-1 text-[11px] leading-relaxed text-white/35">
+              Snapshot received {formatAge(snapshot.fetchedAt)}. Private user, treasury, and approval metrics are intentionally not inferred from public market data.
+            </p>
           </div>
         </Card>
+      </div>
+
+      <Card
+        title="Enabled frontend markets"
+        subtitle="Click a row to inspect the market in the Trading Pairs view. Values update from the public Orderly market feed."
+        actions={
+          <button
+            type="button"
+            onClick={() => void query.refetch()}
+            disabled={query.isRefreshing}
+            className="inline-flex items-center gap-1.5 text-xs text-white/50 hover:text-white disabled:opacity-50"
+          >
+            <RefreshCw size={12} className={query.isRefreshing ? "animate-spin" : ""} />
+            Refresh now
+          </button>
+        }
+      >
+        <DataTable
+          tableKey="live-dashboard-markets"
+          columns={marketColumns}
+          rows={snapshot.markets}
+          emptyTitle="No live markets"
+          initialSortKey="volume"
+        />
+      </Card>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <Link to="/admin/pairs" className="group">
+          <Card className="h-full transition-colors group-hover:border-[rgba(var(--oui-color-primary),0.5)]">
+            <div className="flex items-center gap-3">
+              <Gauge size={19} className="text-[rgb(var(--oui-color-primary-light))]" />
+              <div>
+                <div className="text-sm font-semibold text-white">Inspect every live market</div>
+                <p className="mt-0.5 text-xs text-white/45">Prices, funding, limits, and current market status.</p>
+              </div>
+            </div>
+          </Card>
+        </Link>
+        <Link to="/admin/risk" className="group">
+          <Card className="h-full transition-colors group-hover:border-[rgba(var(--oui-color-primary),0.5)]">
+            <div className="flex items-center gap-3">
+              {averageFunding !== null && averageFunding < 0 ? (
+                <TrendingDown size={19} className="text-[rgb(var(--oui-color-danger-light))]" />
+              ) : (
+                <TrendingUp size={19} className="text-[rgb(var(--oui-color-success))]" />
+              )}
+              <div>
+                <div className="text-sm font-semibold text-white">Review public risk exposure</div>
+                <p className="mt-0.5 text-xs text-white/45">Live open positions when exposed by the selected Orderly network.</p>
+              </div>
+            </div>
+          </Card>
+        </Link>
       </div>
     </div>
   );

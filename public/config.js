@@ -1,6 +1,9 @@
 window.__RUNTIME_CONFIG__ = {
   VITE_ORDERLY_BROKER_ID: "demo",
   VITE_ORDERLY_BROKER_NAME: "Vantide",
+  // Optional upstream-compatible API/proxy override for live admin market
+  // views. Leave blank to follow the selected mainnet/testnet Orderly endpoint.
+  VITE_ORDERLY_API_URL: "",
   VITE_BROKER_EOA_ADDRESS: "0x1cacdf8c0d802e0c65943a729c666b91d6c27346",
   VITE_DISABLE_MAINNET: "false",
   VITE_DISABLE_TESTNET: "false",
@@ -48,6 +51,11 @@ window.__RUNTIME_CONFIG__ = {
   // panel in production, and VITE_ADMIN_PASSCODE to require a passcode.
   VITE_ADMIN_ENABLED: "true",
   VITE_ADMIN_PASSCODE: "",
+  // Optional, authorized backend for private admin data. A same-origin path
+  // (for example "/api/admin") is recommended. Do not put secrets here.
+  VITE_ADMIN_API_URL: "",
+  // Polling cadence for live public market telemetry (minimum 5000ms).
+  VITE_ADMIN_LIVE_REFRESH_MS: "15000",
   // Built-in local analytics tracker shown under /admin/analytics.
   VITE_ADMIN_ANALYTICS_ENABLED: "true",
 };
