@@ -20,8 +20,8 @@ import { AdminButton, TextInput } from "@/admin/components/ui";
 import { ToastProvider, ToastViewport, useToast } from "@/admin/components/feedback";
 import { CommandPalette } from "@/admin/components/CommandPalette";
 import { NAV_GROUPS, ALL_NAV_ITEMS } from "@/admin/nav";
-import { db } from "@/admin/mock/db";
-import { timeAgo } from "@/admin/mock/rng";
+import { isAdminApiConfigured, useAdminResource } from "@/admin/api/client";
+import { formatAge, isRecord } from "@/admin/data/format";
 
 const AUTH_KEY = "vantide-admin-unlocked";
 
@@ -123,6 +123,15 @@ function Breadcrumbs() {
 
 /* ---------------- Notifications bell ---------------- */
 
+function notificationRows(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) return value.filter(isRecord);
+  if (!isRecord(value)) return [];
+  for (const key of ["rows", "items", "notifications", "results"]) {
+    if (Array.isArray(value[key])) return value[key].filter(isRecord);
+  }
+  return [];
+}
+
 function NotificationsBell() {
   const [open, setOpen] = useState(false);
   const [readIds, setReadIds] = useState<Set<string>>(() => {
@@ -132,34 +141,50 @@ function NotificationsBell() {
       return new Set();
     }
   });
+  const apiConfigured = isAdminApiConfigured();
+  const query = useAdminResource<unknown>(
+    "notifications",
+    { limit: 4, status: "unread" },
+    { pollInterval: 30_000 }
+  );
 
   const items = useMemo(() => {
-    const alerts = db.securityAlerts.all().filter((a) => !a.resolved).slice(0, 4);
-    const tickets = db.tickets.all().filter((t) => t.status === "open").slice(0, 3);
-    return [
-      ...alerts.map((a) => ({
-        id: `n-${a.id}`,
-        icon: AlertTriangle,
-        tone: a.severity === "critical" || a.severity === "high" ? "danger" : "warning",
-        text: a.title,
-        sub: timeAgo(a.ts),
-        to: "/admin/security",
-      })),
-      ...tickets.map((t) => ({
-        id: `n-${t.id}`,
-        icon: Info,
-        tone: "info",
-        text: `Open ticket: ${t.subject}`,
-        sub: timeAgo(t.updatedAt),
-        to: "/admin/support",
-      })),
-    ];
-  }, []);
+    return notificationRows(query.data)
+      .map((item, index) => {
+        const idCandidate = item.id ?? item.notification_id ?? item.uuid;
+        const id = typeof idCandidate === "string" || typeof idCandidate === "number"
+          ? String(idCandidate)
+          : `notification-${index}`;
+        const title = typeof item.title === "string"
+          ? item.title
+          : typeof item.subject === "string"
+            ? item.subject
+            : typeof item.message === "string"
+              ? item.message
+              : "Notification";
+        const timestampCandidate = item.updated_at ?? item.updatedAt ?? item.sent_at ?? item.sentAt ?? item.timestamp ?? item.ts;
+        const timestamp = typeof timestampCandidate === "number"
+          ? timestampCandidate
+          : typeof timestampCandidate === "string" && /^\d+$/.test(timestampCandidate)
+            ? Number(timestampCandidate)
+            : undefined;
+        const severity = typeof item.severity === "string" ? item.severity.toLowerCase() : "info";
+        return {
+          id,
+          icon: severity === "critical" || severity === "high" ? AlertTriangle : Info,
+          tone: severity === "critical" || severity === "high" ? "danger" : severity === "warning" ? "warning" : "info",
+          text: title,
+          sub: timestamp ? formatAge(timestamp) : "New",
+          to: "/admin/notifications",
+        };
+      })
+      .slice(0, 4);
+  }, [query.data]);
 
-  const unread = items.filter((i) => !readIds.has(i.id)).length;
+  const unread = items.filter((item) => !readIds.has(item.id)).length;
 
-  const markAllRead = () => {
-    const next = new Set(items.map((i) => i.id));
+  const hideShown = () => {
+    const next = new Set(items.map((item) => item.id));
     setReadIds(next);
     try {
       localStorage.setItem("vantide-admin-read-notifs", JSON.stringify([...next]));
@@ -171,7 +196,7 @@ function NotificationsBell() {
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen((current) => !current)}
         className="relative flex h-9 w-9 items-center justify-center rounded-lg text-white/55 hover:bg-white/5 hover:text-white"
         aria-label="Notifications"
       >
@@ -194,39 +219,43 @@ function NotificationsBell() {
           <div className="admin-pop absolute right-0 top-11 z-40 w-[min(92vw,340px)] rounded-xl border border-white/10 bg-[rgb(var(--oui-color-base-6))] p-2 shadow-2xl">
             <div className="flex items-center justify-between px-2 pb-1.5 pt-1">
               <span className="text-xs font-semibold text-white/70">Notifications</span>
-              <button onClick={markAllRead} className="text-[11px] text-[rgb(var(--oui-color-link))] hover:underline">
-                Mark all read
-              </button>
+              {items.length > 0 && (
+                <button onClick={hideShown} className="text-[11px] text-[rgb(var(--oui-color-link))] hover:underline">Hide shown</button>
+              )}
             </div>
             {items.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-8 text-white/35">
-                <CheckCircle2 size={20} />
-                <span className="text-xs">All clear — nothing needs attention</span>
+                {query.isLoading ? <Bell size={20} className="animate-pulse" /> : <CheckCircle2 size={20} />}
+                <span className="text-center text-xs">
+                  {query.isLoading
+                    ? "Loading notifications…"
+                    : !apiConfigured
+                      ? "Connect an admin API to load notifications"
+                      : query.error
+                        ? "Notification feed is unavailable"
+                        : "No unread notifications"}
+                </span>
               </div>
             ) : (
-              items.map((n) => (
+              items.map((item) => (
                 <Link
-                  key={n.id}
-                  to={n.to}
+                  key={item.id}
+                  to={item.to}
                   onClick={() => setOpen(false)}
-                  className={`flex items-start gap-2.5 rounded-lg px-2 py-2 hover:bg-white/5 ${
-                    readIds.has(n.id) ? "opacity-45" : ""
-                  }`}
+                  className={`flex items-start gap-2.5 rounded-lg px-2 py-2 hover:bg-white/5 ${readIds.has(item.id) ? "opacity-45" : ""}`}
                 >
-                  <span
-                    className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
-                      n.tone === "danger"
-                        ? "bg-[rgba(var(--oui-color-danger),0.15)] text-[rgb(var(--oui-color-danger-light))]"
-                        : n.tone === "warning"
-                          ? "bg-[rgba(var(--oui-color-warning),0.15)] text-[rgb(var(--oui-color-warning))]"
-                          : "bg-[rgba(var(--oui-color-primary),0.15)] text-[rgb(var(--oui-color-primary-light))]"
-                    }`}
-                  >
-                    <n.icon size={12} />
+                  <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
+                    item.tone === "danger"
+                      ? "bg-[rgba(var(--oui-color-danger),0.15)] text-[rgb(var(--oui-color-danger-light))]"
+                      : item.tone === "warning"
+                        ? "bg-[rgba(var(--oui-color-warning),0.15)] text-[rgb(var(--oui-color-warning))]"
+                        : "bg-[rgba(var(--oui-color-primary),0.15)] text-[rgb(var(--oui-color-primary-light))]"
+                  }`}>
+                    <item.icon size={12} />
                   </span>
                   <span className="min-w-0">
-                    <span className="block truncate text-xs text-white/85">{n.text}</span>
-                    <span className="text-[10px] text-white/35">{n.sub}</span>
+                    <span className="block truncate text-xs text-white/85">{item.text}</span>
+                    <span className="text-[10px] text-white/35">{item.sub}</span>
                   </span>
                 </Link>
               ))
@@ -406,9 +435,9 @@ function AdminShell() {
           </div>
 
           {/* Quick actions */}
-          <Link to="/admin/pairs?new=1" className="hidden sm:block">
+          <Link to="/admin/pairs" className="hidden sm:block">
             <AdminButton variant="primary" className="!px-3 !py-1.5 text-xs">
-              + New pair
+              Live markets
             </AdminButton>
           </Link>
           <button

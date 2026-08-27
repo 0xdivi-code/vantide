@@ -63,7 +63,7 @@ export function ThemeEditor() {
   return (
     <Card
       title="Theme & button colors"
-      subtitle="Applies LIVE to the whole dapp — not a mock. Export config.js to ship it to production."
+      subtitle="Applies to the active dapp immediately. Export config.js to ship it to production."
       actions={
         custom ? (
           <Badge tone="primary">
