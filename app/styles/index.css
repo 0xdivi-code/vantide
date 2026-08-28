@@ -139,12 +139,19 @@
 }
 
 /* ===== Admin panel animations ===== */
+/* Every keyframe set must END on `transform: none`. `animation-fill-mode:
+   both` keeps the final keyframe applied forever, and any transform other
+   than `none` turns the element into the containing block for its
+   `position: fixed` descendants. `.admin-page` wraps <Outlet/>, so leaving
+   `translateY(0)` behind made the Drawer / Modal / table-menu overlays inside
+   admin pages position themselves against the page box instead of the
+   viewport — they visibly covered the wrong area. */
 @keyframes admin-fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes admin-pop-in { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-@keyframes admin-drawer-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
-@keyframes admin-toast-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes admin-pop-in { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes admin-drawer-in { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes admin-toast-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
 @keyframes admin-shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
-@keyframes admin-page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes admin-page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes admin-pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
 .admin-fade { animation: admin-fade-in 0.18s ease-out both; }
@@ -158,3 +165,138 @@
   background-size: 800px 100%;
   animation: admin-shimmer 1.3s linear infinite;
 }
+
+/* ===== Admin ON/OFF switch =====
+   Hand-written on purpose. Tailwind's `translate-x-*` utilities all emit the
+   same `transform: translate(var(--tw-translate-x), …)` declaration, and CSS
+   minifiers merge those declarations across sibling rules. When that happens
+   the "off" rule can end up setting only `--tw-translate-x` with no
+   `transform`, so the knob never moves off the left edge of the track and
+   looks like it is overlapping it. These rules have nothing to merge and
+   cannot be purged by the JIT scanner. */
+.admin-switch {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  box-sizing: border-box;
+  width: 64px;
+  height: 30px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  vertical-align: middle;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+.admin-switch[data-on="true"] {
+  background: rgb(var(--oui-color-primary));
+  border-color: rgba(var(--oui-color-primary), 0.85);
+}
+.admin-switch:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.32);
+}
+.admin-switch:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--oui-color-primary), 0.35);
+}
+.admin-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.admin-switch-sm {
+  width: 46px;
+  height: 24px;
+}
+
+.admin-switch-knob {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  margin-top: -11px;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transform: translateX(0);
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+.admin-switch[data-on="true"] .admin-switch-knob {
+  transform: translateX(34px);
+}
+.admin-switch-sm .admin-switch-knob {
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+}
+.admin-switch-sm[data-on="true"] .admin-switch-knob {
+  transform: translateX(22px);
+}
+
+.admin-switch-text {
+  position: absolute;
+  top: 50%;
+  margin-top: -0.5em;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+.admin-switch-text-on {
+  left: 10px;
+  color: rgba(255, 255, 255, 0.92);
+  opacity: 0;
+}
+.admin-switch-text-off {
+  right: 9px;
+  color: rgba(255, 255, 255, 0.55);
+  opacity: 1;
+}
+.admin-switch[data-on="true"] .admin-switch-text-on { opacity: 1; }
+.admin-switch[data-on="true"] .admin-switch-text-off { opacity: 0; }
+.admin-switch-sm .admin-switch-text { display: none; }
+
+.admin-switch-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+}
+.admin-switch-label[data-on="true"] {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-switch,
+  .admin-switch-knob,
+  .admin-switch-text {
+    transition: none;
+  }
+}
+
+/* ===== Admin sign-in screen ===== */
+.admin-auth-field {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgb(var(--oui-color-base-9));
+  padding: 0.55rem 0.75rem;
+  font-size: 0.875rem;
+  color: #fff;
+  outline: none;
+}
+.admin-auth-field::placeholder { color: rgba(255, 255, 255, 0.25); }
+.admin-auth-field:focus {
+  border-color: rgba(var(--oui-color-primary), 0.6);
+  box-shadow: 0 0 0 3px rgba(var(--oui-color-primary), 0.18);
+}
+

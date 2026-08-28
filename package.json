@@ -12,7 +12,10 @@
     "build:spa": "tsx scripts/generate-manifest.ts && NODE_OPTIONS='--max-old-space-size=8192' tsx build.ts && tsx scripts/generate-manifest.ts",
     "dev": "tsx scripts/generate-manifest.ts && vite",
     "generate:manifest": "tsx scripts/generate-manifest.ts",
+    "api:dev": "node --import tsx server/standalone.ts",
+    "api:token": "node --import tsx scripts/admin-token.ts",
     "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
+    "test:api": "node --import tsx --test scripts/test-admin-api.ts",
     "preview": "vite preview",
     "typecheck": "tsc"
   },

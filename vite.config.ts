@@ -5,6 +5,7 @@ import { cjsInterop } from "vite-plugin-cjs-interop";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import fs from "fs";
 import path from "path";
+import { adminApiPlugin } from "./vite-plugins/admin-api";
 
 function loadConfigTitle(): string {
   try {
@@ -58,6 +59,9 @@ export default defineConfig(() => {
       react(),
       tsconfigPaths(),
       htmlTitlePlugin(),
+      // Serves /api/admin in `vite dev` and `vite preview` using the same
+      // router that api/admin/[...path].ts runs in production.
+      adminApiPlugin({ base: "/api/admin" }),
       cjsInterop({
         dependencies: ["bs58", "@coral-xyz/anchor", "lodash"],
       }),

@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Info,
   CheckCircle2,
+  LoaderCircle,
 } from "lucide-react";
 import { getRuntimeConfig } from "@/utils/runtime-config";
 import { useConfigVersion } from "@/admin/useConfigVersion";
@@ -21,9 +22,28 @@ import { ToastProvider, ToastViewport, useToast } from "@/admin/components/feedb
 import { CommandPalette } from "@/admin/components/CommandPalette";
 import { NAV_GROUPS, ALL_NAV_ITEMS } from "@/admin/nav";
 import { isAdminApiConfigured, useAdminResource } from "@/admin/api/client";
+import { AdminAuthProvider, useAdminAuth } from "@/admin/auth/AdminAuthProvider";
+import AdminLogin from "./Login";
 import { formatAge, isRecord } from "@/admin/data/format";
 
 const AUTH_KEY = "vantide-admin-unlocked";
+
+/**
+ * Which gate protects /admin.
+ *   supabase → email + password against Supabase Auth (default when configured)
+ *   passcode → the legacy VITE_ADMIN_PASSCODE lock screen
+ *   none     → no gate (local development)
+ *   ""       → supabase when configured, otherwise passcode when set
+ */
+export type AdminAuthMode = "supabase" | "passcode" | "none" | "";
+
+function resolveAuthMode(): AdminAuthMode {
+  const configured = (getRuntimeConfig("VITE_ADMIN_AUTH_MODE") ?? "").trim().toLowerCase();
+  if (configured === "supabase" || configured === "passcode" || configured === "none") {
+    return configured;
+  }
+  return "";
+}
 
 function AdminBrand() {
   useConfigVersion();
@@ -267,7 +287,94 @@ function NotificationsBell() {
   );
 }
 
+/* ---------------- Signed-in operator ---------------- */
+
+function AdminUserMenu() {
+  const navigate = useNavigate();
+  const toast = useToast();
+  const { email, role, signOut, supabaseConfigured } = useAdminAuth();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const initial = (email ?? "A").charAt(0).toUpperCase();
+  const displayName = email ?? "Passcode session";
+
+  const doSignOut = async () => {
+    setBusy(true);
+    try {
+      if (supabaseConfigured && email) await signOut();
+    } finally {
+      try {
+        sessionStorage.removeItem(AUTH_KEY);
+      } catch {
+        /* ignore */
+      }
+      toast.info("Signed out of the admin session.");
+      setOpen(false);
+      setBusy(false);
+      navigate("/");
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((current) => !current)}
+        className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5"
+        title={displayName}
+        aria-label="Admin account menu"
+        aria-expanded={open}
+      >
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[rgb(var(--oui-color-primary))] text-xs font-bold text-white">
+          {initial}
+        </span>
+        <span className="hidden max-w-[160px] truncate text-xs text-white/60 lg:inline">{displayName}</span>
+        <ChevronRight size={13} className={`text-white/30 transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Close account menu"
+            tabIndex={-1}
+            className="fixed inset-0 z-30 cursor-default"
+            onClick={() => setOpen(false)}
+          />
+          <div className="admin-pop absolute right-0 top-11 z-40 w-64 rounded-xl border border-white/10 bg-[rgb(var(--oui-color-base-6))] p-2 shadow-2xl">
+            <div className="border-b border-white/5 px-2 pb-2 pt-1">
+              <div className="truncate text-xs font-semibold text-white">{displayName}</div>
+              <div className="text-[10px] uppercase tracking-wider text-[rgb(var(--oui-color-primary-light))]">
+                {role ?? (email ? "operator" : "local session")}
+              </div>
+            </div>
+            <button
+              onClick={() => void doSignOut()}
+              disabled={busy}
+              className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs text-white/70 hover:bg-white/5 disabled:opacity-50"
+            >
+              {busy ? <LoaderCircle size={14} className="animate-spin" /> : <LogOut size={14} />}
+              Sign out
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ---------------- Lock screen / disabled ---------------- */
+
+function AuthCheckingScreen() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[rgb(var(--oui-color-base-10))] px-4">
+      <div className="flex flex-col items-center gap-3 text-white/45">
+        <LoaderCircle size={26} className="animate-spin text-[rgb(var(--oui-color-primary-light))]" />
+        <p className="text-xs">Restoring your admin session…</p>
+      </div>
+    </div>
+  );
+}
 
 function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const [value, setValue] = useState("");
@@ -352,10 +459,8 @@ function DisabledScreen() {
 
 function AdminShell() {
   const location = useLocation();
-  const navigate = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
-  const toast = useToast();
 
   // ⌘K / Ctrl+K opens global search
   useEffect(() => {
@@ -451,26 +556,7 @@ function AdminShell() {
             </kbd>
           </button>
           <NotificationsBell />
-          <div className="relative">
-            <button
-              onClick={() => {
-                toast.info("Signed out of the admin session.");
-                try {
-                  sessionStorage.removeItem(AUTH_KEY);
-                } catch {
-                  /* ignore */
-                }
-                navigate("/");
-              }}
-              className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5"
-              title="Sign out"
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[rgb(var(--oui-color-primary))] text-xs font-bold text-white">
-                A
-              </span>
-              <LogOut size={14} className="text-white/40" />
-            </button>
-          </div>
+          <AdminUserMenu />
         </header>
 
         {/* Page body */}
@@ -487,7 +573,8 @@ function AdminShell() {
   );
 }
 
-export default function AdminLayout() {
+function AdminGate() {
+  const { status, supabaseConfigured } = useAdminAuth();
   const [unlocked, setUnlocked] = useState<boolean>(() => {
     try {
       return sessionStorage.getItem(AUTH_KEY) === "1";
@@ -496,17 +583,25 @@ export default function AdminLayout() {
     }
   });
 
-  useConfigVersion();
-
-  const enabled = getRuntimeConfig("VITE_ADMIN_ENABLED") !== "false";
   const passcode = getRuntimeConfig("VITE_ADMIN_PASSCODE");
+  const mode = resolveAuthMode();
+  const useSupabase = mode === "supabase" || (mode === "" && supabaseConfigured);
 
-  useEffect(() => {
-    document.title = "Control Panel";
-  }, []);
+  if (useSupabase) {
+    if (status === "checking") return <AuthCheckingScreen />;
+    if (status !== "signed-in") {
+      // Supabase is the requested gate but is not configured: show the login
+      // screen anyway, it explains exactly what is missing.
+      return <AdminLogin />;
+    }
+    return (
+      <ToastProvider>
+        <AdminShell />
+      </ToastProvider>
+    );
+  }
 
-  if (!enabled) return <DisabledScreen />;
-  if (passcode && !unlocked) {
+  if (mode !== "none" && passcode && !unlocked) {
     return <LockScreen onUnlock={() => setUnlocked(true)} />;
   }
 
@@ -514,5 +609,23 @@ export default function AdminLayout() {
     <ToastProvider>
       <AdminShell />
     </ToastProvider>
+  );
+}
+
+export default function AdminLayout() {
+  useConfigVersion();
+
+  const enabled = getRuntimeConfig("VITE_ADMIN_ENABLED") !== "false";
+
+  useEffect(() => {
+    document.title = "Control Panel";
+  }, []);
+
+  if (!enabled) return <DisabledScreen />;
+
+  return (
+    <AdminAuthProvider>
+      <AdminGate />
+    </AdminAuthProvider>
   );
 }
