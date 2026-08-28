@@ -48,12 +48,21 @@ window.__RUNTIME_CONFIG__ = {
   VITE_RESTRICTED_REGIONS: "",
   VITE_WHITELISTED_IPS: "",
   // Admin panel (/admin). Set VITE_ADMIN_ENABLED to "false" to lock the
-  // panel in production, and VITE_ADMIN_PASSCODE to require a passcode.
+  // panel in production.
   VITE_ADMIN_ENABLED: "true",
+  // Supabase Auth (email + password) gates the admin panel. Leave both empty
+  // to fall back to VITE_ADMIN_PASSCODE. The anon key is safe for browsers;
+  // the service_role key and JWT secret belong on the server (.env.example).
+  VITE_SUPABASE_URL: "",
+  VITE_SUPABASE_ANON_KEY: "",
+  // "supabase" | "passcode" | "none". Empty = supabase when configured.
+  VITE_ADMIN_AUTH_MODE: "",
+  // Legacy fallback gate, used only when Supabase sign-in is not configured.
   VITE_ADMIN_PASSCODE: "",
-  // Optional, authorized backend for private admin data. A same-origin path
-  // (for example "/api/admin") is recommended. Do not put secrets here.
-  VITE_ADMIN_API_URL: "",
+  // Backend that serves private admin data. "/api/admin" is handled by
+  // api/admin/[...path].ts in production and by the vite dev server locally.
+  // See docs/admin-api.md.
+  VITE_ADMIN_API_URL: "/api/admin",
   // Polling cadence for live public market telemetry (minimum 5000ms).
   VITE_ADMIN_LIVE_REFRESH_MS: "15000",
   // Built-in local analytics tracker shown under /admin/analytics.

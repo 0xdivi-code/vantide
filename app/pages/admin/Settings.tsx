@@ -213,15 +213,11 @@ export default function AdminSettings() {
     switch (type) {
       case "boolean":
         return (
-          <div className="flex items-center gap-3">
-            <Toggle
-              checked={value === "true"}
-              onChange={(v) => setValue(key, v ? "true" : "false")}
-            />
-            <span className="text-xs text-white/45">
-              {value === "true" ? "Enabled" : "Disabled"}
-            </span>
-          </div>
+          <Toggle
+            checked={value === "true"}
+            onChange={(v) => setValue(key, v ? "true" : "false")}
+            label
+          />
         );
       case "select":
         return (

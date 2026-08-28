@@ -7,3 +7,6 @@ node_modules
 .specstory/.what-is-this.md
 /public/manifest.json
 node_modules
+# local server secrets (see .env.example)
+.env.local
+.env.*.local

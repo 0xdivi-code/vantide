@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getRuntimeConfig } from "@/utils/runtime-config";
+import { getAdminAccessToken, notifyUnauthorized } from "@/admin/auth/supabase";
 
 export const ADMIN_API_CONFIG_KEY = "VITE_ADMIN_API_URL";
 
@@ -129,8 +130,10 @@ function createAbortSignal(
 /**
  * Make an authenticated request to the operator's backend.
  *
- * Credentials are intentionally cookie-based. Do not put API secrets in a
- * VITE_ variable: all VITE values are shipped to every browser.
+ * Authentication is a Supabase access token attached as `Authorization:
+ * Bearer …` (see app/admin/auth/supabase.ts). Cookies are still sent for
+ * backends that prefer them. Do not put API secrets in a VITE_ variable:
+ * all VITE values are shipped to every browser.
  */
 export async function adminRequest<T>(
   path: string,
@@ -172,6 +175,11 @@ export async function adminRequest<T>(
   }
   if (!headers.has("Accept")) headers.set("Accept", "application/json");
 
+  const accessToken = getAdminAccessToken();
+  if (accessToken && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+
   const { signal, cleanup } = createAbortSignal(suppliedSignal, timeoutMs);
   try {
     const response = await fetch(url, {
@@ -194,6 +202,11 @@ export async function adminRequest<T>(
     }
 
     if (!response.ok) {
+      if (response.status === 401) {
+        // Let the auth provider refresh the token (or reopen the login
+        // screen) instead of leaving every panel showing a red error.
+        notifyUnauthorized();
+      }
       throw new AdminApiError(
         responseMessage(payload, `Admin API request failed (${response.status}).`),
         { status: response.status, details: payload }

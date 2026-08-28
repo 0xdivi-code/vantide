@@ -208,34 +208,69 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   );
 }
 
+/**
+ * ON/OFF switch.
+ *
+ * The visuals live in `app/styles/index.css` (`.admin-switch*`) instead of
+ * Tailwind transform utilities: `translate-x-*` compiles to a shared
+ * `transform` declaration that CSS minifiers merge between rules, which is
+ * what made the knob sit on top of the track edge in the "off" state of
+ * production builds. Plain CSS with `data-on` cannot be purged or merged
+ * away, and the track now carries an explicit ON/OFF label so the current
+ * state is never ambiguous.
+ */
 export function Toggle({
   checked,
   onChange,
   disabled,
+  label,
+  size = "md",
+  ariaLabel,
+  id,
+  className = "",
 }: {
   checked: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
+  /** `true` renders Enabled/Disabled beside the track, a string renders that text. */
+  label?: boolean | string;
+  size?: "sm" | "md";
+  ariaLabel?: string;
+  id?: string;
+  className?: string;
 }) {
+  const stateLabel = checked ? "Enabled" : "Disabled";
+  const describedBy = typeof label === "string" ? label : stateLabel;
+
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-40 ${
-        checked
-          ? "bg-[rgb(var(--oui-color-primary))]"
-          : "bg-white/15"
-      }`}
-    >
-      <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-          checked ? "translate-x-[22px]" : "translate-x-0.5"
-        }`}
-      />
-    </button>
+    <span className={`inline-flex items-center gap-3 ${className}`}>
+      <button
+        type="button"
+        role="switch"
+        id={id}
+        aria-checked={checked}
+        aria-label={ariaLabel ?? describedBy}
+        title={`${describedBy} — click to turn ${checked ? "off" : "on"}`}
+        disabled={disabled}
+        data-on={checked ? "true" : "false"}
+        data-state={checked ? "on" : "off"}
+        onClick={() => onChange(!checked)}
+        className={`admin-switch admin-switch-${size}`}
+      >
+        <span className="admin-switch-text admin-switch-text-on" aria-hidden="true">
+          ON
+        </span>
+        <span className="admin-switch-text admin-switch-text-off" aria-hidden="true">
+          OFF
+        </span>
+        <span className="admin-switch-knob" aria-hidden="true" />
+      </button>
+      {label && (
+        <span className="admin-switch-label" data-on={checked ? "true" : "false"}>
+          {describedBy}
+        </span>
+      )}
+    </span>
   );
 }
 
