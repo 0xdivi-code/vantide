@@ -65,7 +65,7 @@ Your developer will send you one of these:
 
 ### The one skill you need: editing a file on GitHub
 
-You'll use this in Part 3 and whenever you want to change settings later:
+You'll use this in Part 2 and whenever you want to change settings later:
 
 1. Open the file (click through the folders until you see the file, then click
    the file name).
@@ -74,7 +74,7 @@ You'll use this in Part 3 and whenever you want to change settings later:
 3. Make your change — usually pasting a value between two quotes.
 4. Scroll down and click the green **Commit changes** button. That's it —
    you've saved the file. (On Vercel, saving a file automatically triggers a
-   rebuild of the site — see Part 4.)
+   rebuild of the site — see Part 3.)
 
 **Golden rule:** only ever edit the file `public/config.js` (and only the
 values listed in this guide). Every other file is the machinery — changing it
@@ -150,10 +150,10 @@ sidebar → **Project Settings** (gear icon, bottom-left) → **API**.
 
 | # | Supabase calls it | Looks like | Goes to |
 | --- | --- | --- | --- |
-| 1 | **Project URL** | `https://abcdefgh.supabase.co` | GitHub (Part 3) **and** Vercel (Part 4) |
-| 2 | **anon** / **public** key *(on newer projects: "publishable" key)* | `eyJhbGciOi...` (very long) | GitHub (Part 3) |
-| 3 | **service_role** key *(on newer projects: "secret" key)* | `eyJhbGciOi...` (very long) | Vercel **only** (Part 4) |
-| 4 | **JWT Secret** (under "JWT Settings" on the same page) | ~60 random characters | Vercel **only** (Part 4) |
+| 1 | **Project URL** | `https://abcdefgh.supabase.co` | GitHub (Part 2) **and** Vercel (Part 3) |
+| 2 | **anon** / **public** key *(on newer projects: "publishable" key)* | `eyJhbGciOi...` (very long) | GitHub (Part 2) |
+| 3 | **service_role** key *(on newer projects: "secret" key)* | `eyJhbGciOi...` (very long) | Vercel **only** (Part 3) |
+| 4 | **JWT Secret** (under "JWT Settings" on the same page) | ~60 random characters | Vercel **only** (Part 3) |
 
 > ⚠️ **Keep 3 and 4 secret.** The service_role key and the JWT secret are the
 > master keys to your data. They only ever get pasted into Vercel's
@@ -281,9 +281,12 @@ Go through all five checks. If any fails, see [Troubleshooting](#troubleshooting
    you should see a **sign-in box**, not a dashboard.
 4. **You can sign in.** Enter the email + password from step 1.3 → you land in
    the Control Panel (dashboard, users, treasury, KYC, …).
-5. **Data saves.** In the admin panel open **Notifications** → create one →
-   then check Supabase → **Table Editor** → `admin_notifications`: your row is
-   there. That proves writes work end-to-end.
+5. **Data wiring works.** In the admin panel open **Users** (or
+   **Notifications**): the page should load cleanly — rows, or an empty
+   "no records yet" state — **without a red error banner**. That proves the
+   panel is talking to your Supabase database with your signed-in identity.
+   (The panel itself is read-only by design; all record changes happen through
+   the systems behind it.)
 
 🎉 **Done.** The site is live, the admin panel is private, and data persists.
 Everything after this point is optional.
@@ -398,7 +401,7 @@ that switch; it's a one-line change plus a review.
 | Service | Free tier | When you'd pay |
 | --- | --- | --- |
 | GitHub | Free forever | Rarely needed |
-| Supabase | Free — **pauses after ~1 week of inactivity** (logs you can't reach data until you open the dashboard and click Restore; real traffic keeps it awake) | **Pro $25/mo** — recommended once the site is getting real visitors |
+| Supabase | Free — **pauses after ~1 week of inactivity** (the site can't reach its data until you open the Supabase dashboard and click Restore; real traffic keeps it awake) | **Pro $25/mo** — recommended once the site is getting real visitors |
 | Vercel | **Hobby** — free, but licensed for non-commercial/personal use | **Pro $20/mo** — required for a commercial business site |
 | Domain | — | ~$10–15/year |
 
