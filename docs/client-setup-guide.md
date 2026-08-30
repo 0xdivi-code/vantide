@@ -5,8 +5,7 @@ It walks you from "I have a zip / a link to some code" to "my trading site is
 live on the internet with a private admin panel" — **without installing any
 software and without writing any code.**
 
-Everything is done through three free websites in your browser. If you can
-order something online, you can do this.
+Everything is done through three free websites in your browser.
 
 ---
 
