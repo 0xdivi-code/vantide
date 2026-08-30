@@ -1,1 +1,0 @@
-import{G as i,H as n,I as c,L as t,M as o}from"./index-DJCgIpmR.js";import{g as f}from"./utils-VLDa8K91.js";function m(){const e=i(),[a]=n();return c.useEffect(()=>{const r=a.toString(),s=r?`/rewards/affiliate?${r}`:"/rewards/affiliate";e(s,{replace:!0})},[e,a]),t.jsx(o,{children:t.jsx("title",{children:f("Rewards")})})}export{m as default};

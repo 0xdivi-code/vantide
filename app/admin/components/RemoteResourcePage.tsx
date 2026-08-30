@@ -1,5 +1,5 @@
 import { type ReactNode, useMemo, useState } from "react";
-import { Database, Eye, RefreshCw, Search } from "lucide-react";
+import { Database, RefreshCw, Search } from "lucide-react";
 import { getAdminApiUrl, useAdminResource } from "@/admin/api/client";
 import {
   asString,
@@ -245,9 +245,10 @@ export function AdminResourcePage({
       <QueryErrorState error={query.error} onRetry={() => void query.refetch()} compact />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <label className="relative w-full max-w-sm">
+        <label htmlFor={`${resource}-filter`} className="relative w-full max-w-sm">
           <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
           <TextInput
+            id={`${resource}-filter`}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={`Filter ${title.toLowerCase()}…`}

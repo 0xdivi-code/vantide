@@ -1,1 +1,0 @@
-import{K as s}from"./index-DJCgIpmR.js";function p(e){return`${e} | ${s("VITE_ORDERLY_BROKER_NAME")}`}function i(e,o="base-type"){const t=e.split("_"),r=t[0],a=t[1],n=t[2];return o.replace("type",r).replace("base",a).replace("quote",n)}export{i as f,p as g};

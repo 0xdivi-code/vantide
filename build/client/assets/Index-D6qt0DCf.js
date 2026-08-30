@@ -1,1 +1,0 @@
-import{G as s,H as c,I as n}from"./index-DJCgIpmR.js";import{D as o}from"./storage-V4NyRneJ.js";function u(){const r=s(),[a]=c();return n.useEffect(()=>{const e=a.toString(),t=`/perp/${o}${e?`?${e}`:""}`;r(t,{replace:!0})},[r,a]),null}export{u as default};

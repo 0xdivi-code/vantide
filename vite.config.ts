@@ -71,6 +71,10 @@ export default defineConfig(() => {
     ],
     build: {
       outDir: "build/client",
+      // Computing gzip sizes for every chunk on an 18k-module build costs
+      // hundreds of MB of RAM and a lot of time, for a log message nobody
+      // reads. Disabling it keeps the build within smaller memory budgets.
+      reportCompressedSize: false,
     },
     optimizeDeps: {
       include: ["react", "react-dom", "react-router-dom"],

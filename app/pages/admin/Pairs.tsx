@@ -215,8 +215,9 @@ export default function AdminPairs() {
           </div>
 
           <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-[rgb(var(--oui-color-base-8))] p-3 sm:flex-row sm:items-center">
-            <label className="relative min-w-0 flex-1">
+            <label htmlFor="pairs-filter" className="relative min-w-0 flex-1">
               <TextInput
+                id="pairs-filter"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search ticker or symbol…"

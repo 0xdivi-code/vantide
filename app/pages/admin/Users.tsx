@@ -6,7 +6,7 @@ import { usePublicTraders, type PublicTrader } from "@/admin/api/orderly";
 import { formatNumber, formatPercent, formatUsd, shortAddress } from "@/admin/data/format";
 import { AdminResourcePage } from "@/admin/components/RemoteResourcePage";
 import { DataTable, type Column } from "@/admin/components/DataTable";
-import { Badge, Card, PageHeader, StatCard, TextInput } from "@/admin/components/ui";
+import { Card, PageHeader, StatCard, TextInput } from "@/admin/components/ui";
 import {
   EmptyDataState,
   LiveDataBar,
@@ -156,9 +156,10 @@ function PublicTradersPage() {
           </div>
 
           <Card>
-            <label className="relative block max-w-md">
+            <label htmlFor="users-filter" className="relative block max-w-md">
               <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
               <TextInput
+                id="users-filter"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Filter by wallet or broker ID…"

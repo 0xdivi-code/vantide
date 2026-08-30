@@ -118,8 +118,12 @@ export const getEvmInitialConfig = () => {
         options: {
           wallets,
           appMetadata: {
-            name: getRuntimeConfig("VITE_ORDERLY_BROKER_NAME"),
-            description: getRuntimeConfig("VITE_ORDERLY_BROKER_NAME"),
+            // onboard requires non-optional strings — fall back to the
+            // same defaults getEvmConnectors uses.
+            name: getRuntimeConfig("VITE_ORDERLY_BROKER_NAME") || "Vantide",
+            description:
+              getRuntimeConfig("VITE_APP_DESCRIPTION") ||
+              "Orderly Trading Application",
           },
         },
       }
