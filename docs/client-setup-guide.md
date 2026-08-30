@@ -22,10 +22,6 @@ This app is made of three parts, each living on a different service:
 You will create accounts on all three, connect them to each other, and you're
 done. After the initial setup, the site updates itself whenever a file changes.
 
-**Total time:** about 60–90 minutes, most of it waiting for things to finish.
-**Total cost to start:** $0. (Paid upgrades are listed in
-[Part 8 — Costs](#part-8--what-this-costs).)
-
 ### What you need before you start
 
 - [ ] An email address you check regularly (used for all three sign-ups)
