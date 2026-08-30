@@ -391,20 +391,6 @@ that switch; it's a one-line change plus a review.
 
 ---
 
-## Part 8 — What this costs
-
-| Service | Free tier | When you'd pay |
-| --- | --- | --- |
-| GitHub | Free forever | Rarely needed |
-| Supabase | Free — **pauses after ~1 week of inactivity** (the site can't reach its data until you open the Supabase dashboard and click Restore; real traffic keeps it awake) | **Pro $25/mo** — recommended once the site is getting real visitors |
-| Vercel | **Hobby** — free, but licensed for non-commercial/personal use | **Pro $20/mo** — required for a commercial business site |
-| Domain | — | ~$10–15/year |
-
-A realistic "we're live and serious" budget is therefore about **$45/month
-plus the domain**.
-
----
-
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
