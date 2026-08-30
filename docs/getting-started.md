@@ -4,6 +4,10 @@ This walks through every step, in order. Part A gets the app running with zero
 configuration. Part B connects a real Supabase project so `/admin` uses email +
 password sign-in and stores data in Postgres.
 
+> Handing the project to a non-programmer? Use
+> [`docs/client-setup-guide.md`](./client-setup-guide.md) instead — it covers
+> the GitHub → Supabase → Vercel flow without a terminal.
+
 ---
 
 # Part A — Launch locally (no accounts needed)

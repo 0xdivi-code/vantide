@@ -7,6 +7,11 @@ node_modules
 .specstory/.what-is-this.md
 /public/manifest.json
 node_modules
+# build output (yarn build / yarn build:spa → build/client) — never commit
+/build
+# macOS Finder metadata
+.DS_Store
+**/.DS_Store
 # local server secrets (see .env.example)
 .env.local
 .env.*.local

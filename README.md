@@ -12,6 +12,13 @@ yarn dev          # dapp + admin API on http://localhost:5173
 Step-by-step local setup and Supabase connection guide:
 **[`docs/getting-started.md`](docs/getting-started.md)**
 
+## Handing this to a non-technical client?
+
+**[`docs/client-setup-guide.md`](docs/client-setup-guide.md)** is a zero-terminal,
+click-by-click guide (GitHub → Supabase → Vercel) written for operators who
+don't code. Point the client at it and they can deploy and run the site
+themselves.
+
 ## Admin console
 
 `/admin` is the operator console. It is gated by a Supabase email + password

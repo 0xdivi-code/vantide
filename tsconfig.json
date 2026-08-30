@@ -23,7 +23,11 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./app/*"]
+      "@/*": ["./app/*"],
+      // Redirect the ethers v5 deep import used by @orderly.network/core's
+      // type declarations to a shim (see types/ethers-src-ts-utils.d.ts) so
+      // tsc does not compile ethers' legacy src.ts sources.
+      "ethers/src.ts/utils": ["./types/ethers-src-ts-utils.d.ts"]
     },
 
     // Vite takes care of building everything, not tsc.
