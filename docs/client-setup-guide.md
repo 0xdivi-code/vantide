@@ -17,7 +17,7 @@ This app is made of three parts, each living on a different service:
 | --- | --- | --- |
 | **The website code** | The trading site itself | **GitHub** (stores the code) |
 | **The admin login + data** | Email/password sign-in and the data behind your admin panel | **Supabase** (a database service) |
-| **The hosting** | The computers that run the site 24/7 and put it on the internet | **Vercel** |
+| **The hosting** | The computers that run the site 24/7 and put it on the internet | **Vercel**/**Hostinger** |
 
 You will create accounts on all three, connect them to each other, and you're
 done. After the initial setup, the site updates itself whenever a file changes.
