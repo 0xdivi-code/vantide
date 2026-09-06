@@ -153,7 +153,7 @@ function PublicAccountPage({ address }: { address: string }) {
         description={`Live public account and open-position data for ${shortAddress(address, 10)}. No account controls or private identity data are fabricated in the browser.`}
       />
       <LiveDataBar
-        source="Orderly public API"
+        source="Vantide public API"
         updatedAt={query.updatedAt}
         refreshing={query.isRefreshing}
         onRefresh={() => void query.refetch()}
@@ -163,7 +163,7 @@ function PublicAccountPage({ address }: { address: string }) {
       {!accounts || accounts.length === 0 ? (
         <EmptyDataState
           title="No public account was found"
-          hint="The address may not be registered on the currently selected Orderly network, or it may not have public account state yet."
+          hint="The address may not be registered on the currently selected Vantide network, or it may not have public account state yet."
         />
       ) : (
         <>

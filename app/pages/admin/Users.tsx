@@ -131,10 +131,10 @@ function PublicTradersPage() {
     <div className="space-y-5">
       <PageHeader
         title="Public Trader Activity"
-        description="Live public trader rankings from Orderly. Wallet addresses and market statistics are available without inventing user profiles, email addresses, KYC status, or balances."
+        description="Live public trader rankings from Vantide. Wallet addresses and market statistics are available without inventing user profiles, email addresses, KYC status, or balances."
       />
       <LiveDataBar
-        source={snapshot?.source || "Orderly public API"}
+        source={snapshot?.source || "Vantide public API"}
         updatedAt={snapshot?.lastUpdatedAt ?? snapshot?.fetchedAt}
         refreshing={query.isRefreshing}
         onRefresh={() => void query.refetch()}

@@ -38,7 +38,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
     label: "App description",
     group: "General",
     type: "textarea",
-    placeholder: "Orderly Trading Application",
+    placeholder: "Vantide Trading Application",
     description: "Meta description used by search engines and link previews.",
   },
   {
@@ -222,12 +222,12 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   },
   {
     key: "VITE_ORDERLY_API_URL",
-    label: "Orderly API URL override",
+    label: "Vantide API URL override",
     group: "Advanced",
     type: "url",
     placeholder: "https://api.orderly.org",
     description:
-      "Optional API/proxy override for the live admin market queries. Leave empty to follow the frontend's selected Orderly network.",
+      "Optional API/proxy override for the live admin market queries. Leave empty to follow the frontend's selected Vantide network.",
   },
   {
     key: "VITE_SYMBOL_LIST",

@@ -1,7 +1,7 @@
 /**
  * Working theme customization. Selected colors are stored as admin config
  * overrides (THEME_COLOR_* keys). <ThemeInjector/> (mounted in App.tsx)
- * converts them to the "R G B" triplet format the Orderly UI CSS variables
+ * converts them to the "R G B" triplet format the Vantide UI CSS variables
  * expect and injects a :root override, so the whole dapp — buttons, links,
  * badges, charts — re-themes live, no reload. Exported config.js carries
  * the same keys for production.

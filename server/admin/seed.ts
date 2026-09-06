@@ -133,7 +133,7 @@ function notifications(): Row[] {
   const titles = [
     "Insurance fund utilisation above 60%",
     "Withdrawal queue backlog cleared",
-    "Orderly DEX latency spike detected",
+    "Vantide DEX latency spike detected",
     "Weekly fee settlement completed",
     "New perpetual listing scheduled: XPL",
     "KYC backlog above 48h SLA",
@@ -223,7 +223,7 @@ function systemFlags(): Row[] {
     { id: "flag_deposits", key: "deposits_enabled", label: "Deposits enabled", value: "true", scope: "global", updated_by: "ops@vantide.io", updated_at: at(4, 11) },
     { id: "flag_new_listings", key: "new_listings_enabled", label: "New listings enabled", value: "true", scope: "global", updated_by: "listing@vantide.io", updated_at: at(12, 8) },
     { id: "flag_signup", key: "signups_enabled", label: "New signups enabled", value: "true", scope: "global", updated_by: "ops@vantide.io", updated_at: at(30, 9) },
-    { id: "flag_api", key: "public_api_enabled", label: "Public API enabled", value: "true", scope: "global", updated_by: "platform@vantide.io", updated_at: at(45, 9) },
+    { id: "flag_api", key: "public_api_enabled", label: "API enabled", value: "true", scope: "global", updated_by: "platform@vantide.io", updated_at: at(45, 9) },
   ];
 }
 

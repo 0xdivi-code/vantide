@@ -38,7 +38,7 @@ export const getEvmConnectors = (): CreateConnectorFn[] => {
         metadata: {
           name: getRuntimeConfig("VITE_APP_NAME") || "Orderly App",
           description:
-            getRuntimeConfig("VITE_APP_DESCRIPTION") || "Orderly Application",
+            getRuntimeConfig("VITE_APP_DESCRIPTION") || "Vantide Application",
           url: window.location.origin,
           icons: [`${window.location.origin}/favicon.webp`],
         },
@@ -123,7 +123,7 @@ export const getEvmInitialConfig = () => {
             name: getRuntimeConfig("VITE_ORDERLY_BROKER_NAME") || "Vantide",
             description:
               getRuntimeConfig("VITE_APP_DESCRIPTION") ||
-              "Orderly Trading Application",
+              "Vantide Trading Application",
           },
         },
       }

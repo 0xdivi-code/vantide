@@ -78,7 +78,7 @@ function parseConfiguredBaseUrl(value: string | undefined): string | undefined {
 }
 
 /**
- * A configured admin API is deliberately optional. Public Orderly market
+ * A configured admin API is deliberately optional. Public Vantide market
  * data works without it; private operational data must be served by a
  * same-origin (or CORS-enabled) backend with real authorization.
  */
