@@ -206,7 +206,7 @@ yarn test:api
 
 ---
 
-## 8. Public Orderly queries used by the frontend views
+## 8. Public queries used by the frontend views
 
 The live market fallback uses Orderly's zero-auth Public Info API:
 
@@ -215,4 +215,3 @@ The live market fallback uses Orderly's zero-auth Public Info API:
 - `accountState` for a selected public wallet
 - `platformPositions` for the no-backend Risk Monitor
 
-These are read-only public network queries. They cannot create markets, move funds, or alter account state. See the [Orderly Public Info API](https://orderly.network/docs/build-on-omnichain/public-info-api/overview) for the upstream schema and rate limits.
