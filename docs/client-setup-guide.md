@@ -148,7 +148,7 @@ sidebar → **Project Settings** (gear icon, bottom-left) → **API**.
 | 1 | **Project URL** | `https://abcdefgh.supabase.co` | GitHub (Part 2) **and** Vercel (Part 3) |
 | 2 | **anon** / **public** key *(on newer projects: "publishable" key)* | `eyJhbGciOi...` (very long) | GitHub (Part 2) |
 | 3 | **service_role** key *(on newer projects: "secret" key)* | `eyJhbGciOi...` (very long) | Vercel **only** (Part 3) |
-| 4 | **JWT Secret** (under "JWT Settings" on the same page) | ~60 random characters | Vercel **only** (Part 3) |
+| 4 | **JWT Secret** (under "JWT Settings" on the same page) — legacy projects only | ~60 random characters | Vercel **only** (Part 3) |
 
 > ⚠️ **Keep 3 and 4 secret.** The service_role key and the JWT secret are the
 > master keys to your data. They only ever get pasted into Vercel's
@@ -159,10 +159,13 @@ sidebar → **Project Settings** (gear icon, bottom-left) → **API**.
 > visible in a browser. Pasting them into GitHub in Part 3 is safe and normal.
 >
 > ⚠️ **If you can't find the JWT Secret:** Supabase is mid-migration to a new
-> key system. Look for "JWT Settings" → "JWT Secret" on the API settings page
-> (you may have to click *Reveal*). If your project only offers "Signing keys"
-> (asymmetric), ask your developer for help before continuing — this app needs
-> the classic symmetric secret.
+> key system. New projects (after May 2025) use **asymmetric ES256 keys** and
+> may not show a symmetric JWT Secret. That's fine — this app now verifies
+> ES256 tokens automatically via `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`.
+> Just set `SUPABASE_URL` on the server (Vercel) and you can leave
+> `SUPABASE_JWT_SECRET` empty. If your project still shows a JWT Secret, set
+> both — the server will accept either HS256 (legacy) or ES256 (new) tokens
+> during migration.
 
 Paste all four into a temporary note. (Not into a shared doc! They're keys.)
 
@@ -247,9 +250,14 @@ these three, one by one (click **Add** after each):
 
 | Name (copy exactly) | Value |
 | --- | --- |
-| `SUPABASE_URL` | your value #1 (Project URL) |
+| `SUPABASE_URL` | your value #1 (Project URL) — **required** for new ES256 projects (JWKS verification) |
 | `SUPABASE_SERVICE_ROLE_KEY` | your value #3 (service_role / secret key) |
-| `SUPABASE_JWT_SECRET` | your value #4 (JWT Secret) |
+| `SUPABASE_JWT_SECRET` | your value #4 (JWT Secret) — **optional** for new ES256 projects, required for legacy HS256 |
+
+> New projects created after May 2025 sign tokens with ES256. The server
+> fetches the public key from `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`,
+> so `SUPABASE_URL` alone is enough. If you have a JWT Secret, set it too —
+> the server will then accept both old and new tokens.
 
 Leave "Environments" at the default (all three ticked).
 

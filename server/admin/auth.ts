@@ -5,8 +5,11 @@
  *   1. `x-admin-api-key` — machine-to-machine (cron, CLI, monitoring).
  *   2. `Authorization: Bearer <Supabase access token>` — the token the admin
  *      panel receives from Supabase email/password sign-in. Verified with
- *      HS256 against `SUPABASE_JWT_SECRET`, then checked against the
- *      `admin_operators` table (or `ADMIN_ALLOWLIST_EMAILS`).
+ *      either:
+ *        - HS256 against `SUPABASE_JWT_SECRET` (legacy projects), or
+ *        - ES256/RS256 via JWKS fetched from {SUPABASE_URL}/auth/v1/.well-known/jwks.json
+ *          (new projects created after May 2025).
+ *      Then checked against the `admin_operators` table (or `ADMIN_ALLOWLIST_EMAILS`).
  *
  * No secret is ever sent to the browser; the panel only ever holds the
  * short-lived user access token that Supabase already gave it.
@@ -14,7 +17,7 @@
 
 import type { AdminApiEnv } from "./env";
 import { supabaseEnabled } from "./env";
-import { JwtError, verifyHs256 } from "./jwt";
+import { JwtError, verifyJwt } from "./jwt";
 import { selectRows } from "./supabase";
 import { forbidden, unauthorized, type AdminCaller } from "./types";
 
@@ -76,17 +79,32 @@ export async function authenticate(
     throw unauthorized("Missing credentials. Sign in to the admin panel, then retry.");
   }
 
-  if (!env.supabaseJwtSecret) {
+  // For new Supabase projects the token is ES256 and must be verified via JWKS.
+  // For legacy projects it's HS256 and needs SUPABASE_JWT_SECRET.
+  // We require at least one of the two to be configured.
+  if (!env.supabaseJwtSecret && !env.supabaseUrl) {
     throw unauthorized(
-      "The server cannot verify Supabase tokens because SUPABASE_JWT_SECRET is not set."
+      "The server cannot verify Supabase tokens because neither SUPABASE_JWT_SECRET nor SUPABASE_URL is set. " +
+        "Set SUPABASE_URL to enable JWKS verification for new projects (ES256), or set SUPABASE_JWT_SECRET for legacy HS256 projects."
     );
   }
 
   let claims;
   try {
-    claims = verifyHs256(token, env.supabaseJwtSecret);
+    claims = await verifyJwt(token, {
+      secret: env.supabaseJwtSecret,
+      supabaseUrl: env.supabaseUrl,
+    });
   } catch (error) {
     const message = error instanceof JwtError ? error.message : "The session token is invalid.";
+    // Add extra hint for common migration error
+    if (error instanceof JwtError && (error.code === "MISSING_SECRET" || error.code === "JWKS_REQUIRED")) {
+      throw unauthorized(
+        `${message} ` +
+          "If your Supabase project was created after May 2025 it uses ES256 — set SUPABASE_URL on the server so the API can fetch " +
+          "{SUPABASE_URL}/auth/v1/.well-known/jwks.json. For older projects set SUPABASE_JWT_SECRET (JWT Secret from Supabase → Settings → API)."
+      );
+    }
     throw unauthorized(message);
   }
 

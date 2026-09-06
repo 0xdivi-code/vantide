@@ -22,7 +22,11 @@ const secret = process.env.SUPABASE_JWT_SECRET;
 const ttl = Number(process.env.ADMIN_TOKEN_TTL_SEC ?? "3600");
 
 if (!secret) {
-  console.error("SUPABASE_JWT_SECRET must be set (Supabase → Project Settings → API → JWT Secret).");
+  console.error(
+    "SUPABASE_JWT_SECRET must be set (Supabase → Project Settings → API → JWT Secret).\n" +
+      "For new Supabase projects that use ES256 asymmetric keys, this helper only works if you also set SUPABASE_JWT_SECRET on the server to accept HS256 tokens during local development.\n" +
+      "Otherwise, sign in through the UI to get a real ES256 token, or set SUPABASE_URL and use a real Supabase session."
+  );
   process.exit(1);
 }
 if (!email) {
