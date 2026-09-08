@@ -120,7 +120,10 @@ export function loadDotEnv(files: string[] = [".env.local", ".env"]): string[] {
 export function publicEnvSummary(env: AdminApiEnv) {
   return {
     supabaseConfigured: supabaseEnabled(env),
-    jwtVerification: Boolean(env.supabaseJwtSecret),
+    // New Supabase projects use ES256 and can be verified via JWKS using only SUPABASE_URL,
+    // so jwtVerification is true if either the legacy secret or the project URL is present.
+    jwtVerification: Boolean(env.supabaseJwtSecret || env.supabaseUrl),
+    jwtMode: env.supabaseJwtSecret && env.supabaseUrl ? "hs256+jwks" : env.supabaseUrl ? "jwks" : env.supabaseJwtSecret ? "hs256" : "none",
     allowlistEmails: env.allowlistEmails.length,
     authRequired: env.requireAuth,
     store: supabaseEnabled(env) ? "supabase" : "memory",

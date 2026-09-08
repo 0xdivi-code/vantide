@@ -159,17 +159,19 @@ Open **Project Settings** (gear icon, bottom left) → **API**:
 | Project URL | "Project URL", looks like `https://abcdefgh.supabase.co` | browser + server |
 | `anon` `public` key | "Project API keys" → `anon` `public` | browser |
 | `service_role` `secret` key | "Project API keys" → `service_role` `secret` | **server only** |
-| JWT secret | "JWT Settings" → JWT Secret | **server only** |
+| JWT secret | "JWT Settings" → JWT Secret (legacy HS256 only) | **server only** — optional for new ES256 projects |
 
 Menu labels move around as Supabase ships changes; if you cannot find one,
 search the settings page for the key name.
 
 > **Heads-up on the JWT secret.** Supabase is migrating projects from the
-> symmetric HS256 "JWT Secret" to asymmetric JWT signing keys. This API verifies
-> tokens with **HS256** (`server/admin/jwt.ts`), so it needs the symmetric
-> secret. If your project only offers signing keys, either use the legacy
-> symmetric secret shown on that page, or keep the allowlist path
-> (`ADMIN_ALLOWLIST_EMAILS`) and set `SUPABASE_JWT_SECRET` to the legacy value.
+> symmetric HS256 "JWT Secret" to asymmetric ES256 signing keys. New projects
+> created after May 2025 sign tokens with ES256 and publish the public key at
+> `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`. This API now verifies **both**
+> flavours (`server/admin/jwt.ts`):
+> - If your project shows a JWT Secret, set `SUPABASE_JWT_SECRET` (legacy) — it will still work.
+> - If your project only shows "Signing keys" (ES256), you don't need `SUPABASE_JWT_SECRET` at all — just set `SUPABASE_URL` and the server will fetch the JWKS automatically.
+> - During migration you can set **both** — the server will accept either HS256 or ES256 tokens.
 
 ### B5. Grant that account admin access
 
@@ -204,6 +206,11 @@ every variable):
 ```bash
 SUPABASE_URL=https://abcdefgh.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi…service_role…
+
+# For legacy HS256 projects — copy from Supabase → Settings → API → JWT Secret
+# For new ES256 projects (after May 2025) this is optional — set SUPABASE_URL
+# and the server fetches {SUPABASE_URL}/auth/v1/.well-known/jwks.json automatically.
+# Set both during migration to accept either token type.
 SUPABASE_JWT_SECRET=your-symmetric-jwt-secret
 
 # Optional
@@ -253,10 +260,11 @@ Restart `yarn dev` (config changes need a restart). The startup line should now
 read:
 
 ```
-  ➜  admin API  /api/admin (supabase, jwt on)
+  ➜  admin API  /api/admin (supabase, jwt jwks)
 ```
 
-`supabase` means reads and writes go to Postgres; `jwt on` means tokens are
+or `jwt hs256+jwks` if you set both secret and URL, or `jwt hs256` for legacy.
+`supabase` means reads and writes go to Postgres; `jwt …` means tokens are
 being verified. Then:
 
 1. Open `http://localhost:5173/admin`.
@@ -322,7 +330,7 @@ For a real deployment on a static host, use the HTTPS origin of the dapp:
 1. Import the repo. `vercel.json` already sets the build command
    (`yarn run build`) and output directory (`build/client`).
 2. Project → Settings → Environment Variables: add `SUPABASE_URL`,
-   `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, and optionally
+   `SUPABASE_SERVICE_ROLE_KEY`, and optionally `SUPABASE_JWT_SECRET` (required only for legacy HS256 projects; new ES256 projects only need `SUPABASE_URL`), and optionally
    `ADMIN_ALLOWLIST_EMAILS` / `ADMIN_API_KEY`.
 3. Deploy. `api/admin/[...path].ts` is picked up automatically and served at
    `/api/admin/*`, which is what `VITE_ADMIN_API_URL` already points at.
@@ -348,8 +356,8 @@ only.
 | "That email and password combination was not accepted" | Wrong credentials, or user does not exist in Auth | Create the user in Authentication → Users (B3) |
 | "Confirm your email address in Supabase before signing in" | Email confirmation is on and the address is unconfirmed | Confirm the user, or tick **Auto Confirm User** |
 | Signed in, but screens show 403 | Account is not an operator | B5 — add an `admin_operators` row, `app_metadata.role`, or allowlist the email |
-| API returns 401 "SUPABASE_JWT_SECRET is not set" | Server variable missing | Add it to `.env.local` (B6) and restart |
-| API returns 401 with a valid login | Project uses asymmetric JWT signing keys | Use the legacy symmetric secret, or rely on `ADMIN_ALLOWLIST_EMAILS` (B4) |
+| API returns 401 "SUPABASE_JWT_SECRET is not set" | Server variable missing | For new ES256 projects set `SUPABASE_URL` instead — the server fetches JWKS. For legacy HS256, add `SUPABASE_JWT_SECRET` to `.env.local` (B6) and restart |
+| API returns 401 with a valid login / "Unsupported token algorithm" / "BAD_SIGNATURE" | Project uses asymmetric JWT signing keys (ES256) but server has no SUPABASE_URL, or token is from a different project | Set `SUPABASE_URL` on the server so it can fetch `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`. For legacy projects, set `SUPABASE_JWT_SECRET`. Setting both accepts either during migration |
 | Startup says `memory store` but you configured Supabase | `SUPABASE_URL` or `SUPABASE_SERVICE_ROLE_KEY` not reaching the server | Check `.env.local` spelling; a shell export overrides the file |
 | API returns 503 `STORE_DISABLED` | `ADMIN_API_ALLOW_MEMORY_STORE=false` and no Supabase credentials | Set both Supabase server variables, or remove that flag |
 | API returns 502 `SUPABASE_ERROR` | Table missing, or service_role key wrong | Re-run `schema.sql` (B2) and re-copy the key (B4) |

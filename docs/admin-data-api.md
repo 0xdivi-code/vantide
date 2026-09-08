@@ -76,9 +76,9 @@ VITE_ADMIN_PASSCODE: "",                    // legacy fallback gate
 
 | Variable | Purpose |
 | --- | --- |
-| `SUPABASE_URL` | Project URL — enables Postgres as the data store |
+| `SUPABASE_URL` | Project URL — enables Postgres as the data store **and** JWKS verification for new ES256 projects (`{URL}/auth/v1/.well-known/jwks.json`) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only key used to read/write the admin tables |
-| `SUPABASE_JWT_SECRET` | Verifies the admin access token (Settings → API → JWT Secret) |
+| `SUPABASE_JWT_SECRET` | Verifies legacy HS256 tokens (Settings → API → JWT Secret). Optional for new projects that use ES256 — set both during migration to accept both token types |
 | `ADMIN_ALLOWLIST_EMAILS` | Comma separated emails granted access |
 | `ADMIN_API_KEY` | Optional machine key, sent as `x-admin-api-key` |
 | `ADMIN_API_ALLOWED_ORIGINS` | Browser origins allowed cross-origin |

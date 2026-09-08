@@ -56,10 +56,8 @@ export function adminApiPlugin(options: AdminApiPluginOptions = {}): Plugin {
   };
 
   const logStatus = (logger: { info: (msg: string) => void }) => {
-    logger.info(
-      `  ➜  admin API  ${base} (${env.supabaseUrl ? "supabase" : "memory store"}, ` +
-        `jwt ${env.supabaseJwtSecret ? "on" : "off"})`
-    );
+    const jwtMode = env.supabaseJwtSecret && env.supabaseUrl ? "hs256+jwks" : env.supabaseUrl ? "jwks" : env.supabaseJwtSecret ? "hs256" : "off";
+    logger.info(`  ➜  admin API  ${base} (${env.supabaseUrl ? "supabase" : "memory store"}, jwt ${jwtMode})`);
   };
 
   return {

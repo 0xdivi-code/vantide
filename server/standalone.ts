@@ -55,8 +55,15 @@ server.listen(port, host, () => {
   if (!env.supabaseUrl) {
     console.log("[admin-api] SUPABASE_URL is not set — serving the bundled memory store.");
   }
-  if (!env.supabaseJwtSecret && env.requireAuth) {
-    console.log("[admin-api] SUPABASE_JWT_SECRET is not set — Supabase sign-ins will be rejected.");
+  if (!env.supabaseJwtSecret && !env.supabaseUrl && env.requireAuth) {
+    console.log(
+      "[admin-api] Neither SUPABASE_JWT_SECRET nor SUPABASE_URL is set — Supabase sign-ins will be rejected. " +
+        "Set SUPABASE_URL for new ES256 projects (JWKS), or SUPABASE_JWT_SECRET for legacy HS256 projects."
+    );
+  } else if (!env.supabaseJwtSecret && env.supabaseUrl) {
+    console.log("[admin-api] SUPABASE_JWT_SECRET not set — verifying ES256 tokens via JWKS from SUPABASE_URL.");
+  } else if (env.supabaseJwtSecret && !env.supabaseUrl) {
+    console.log("[admin-api] SUPABASE_URL not set — only HS256 tokens can be verified. Set SUPABASE_URL for ES256 (new projects).");
   }
 });
 
