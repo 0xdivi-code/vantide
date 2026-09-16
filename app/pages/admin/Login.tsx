@@ -1,7 +1,7 @@
 /**
  * Admin sign-in screen.
  *
- * Email + password against Supabase Auth. The resulting access token is used
+ * Email + password against MongoDB. The resulting access token is used
  * both to unlock the panel and as the `Authorization: Bearer` credential for
  * every `/api/admin/*` call, so the UI and the API share one identity.
  */
@@ -11,15 +11,11 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, Eye, EyeOff, KeyRound, LoaderCircle, Lock, ShieldCheck } from "lucide-react";
 import { AdminButton, TextInput } from "@/admin/components/ui";
 import { getRuntimeConfig } from "@/utils/runtime-config";
-import {
-  SUPABASE_ANON_KEY,
-  SUPABASE_URL_KEY,
-  SupabaseAuthError,
-} from "@/admin/auth/supabase";
+import { AdminAuthError } from "@/admin/auth/session";
 import { useAdminAuth } from "@/admin/auth/AdminAuthProvider";
 
 function friendlyMessage(error: unknown): string {
-  if (error instanceof SupabaseAuthError) return error.message;
+  if (error instanceof AdminAuthError) return error.message;
   if (error instanceof Error && error.message) return error.message;
   return "Sign-in failed. Please try again.";
 }
@@ -30,15 +26,11 @@ function NotConfiguredNotice() {
       <div className="flex items-start gap-2.5">
         <AlertTriangle size={16} className="mt-0.5 shrink-0 text-[rgb(var(--oui-color-warning))]" />
         <div className="min-w-0 space-y-1.5">
-          <p className="text-xs font-semibold text-white">Supabase is not configured</p>
+          <p className="text-xs font-semibold text-white">MongoDB is not configured</p>
           <p className="text-[11px] leading-relaxed text-white/55">
-            Add both values to <code className="rounded bg-white/10 px-1 py-0.5">public/config.js</code> (or set them
-            from the Config Editor once unlocked):
+            Set <code className="rounded bg-white/10 px-1 py-0.5">VITE_ADMIN_API_URL=/api/admin</code> in public/config.js,
+            then configure <code className="rounded bg-white/10 px-1 py-0.5">MONGODB_URI</code> on the server.
           </p>
-          <ul className="space-y-1 font-mono text-[11px] text-white/60">
-            <li>{SUPABASE_URL_KEY}=https://your-project.supabase.co</li>
-            <li>{SUPABASE_ANON_KEY}=eyJhbGciOi…</li>
-          </ul>
           <p className="text-[11px] leading-relaxed text-white/40">
             Then grant your account admin access — see <code className="rounded bg-white/10 px-1 py-0.5">docs/admin-api.md</code>.
           </p>
@@ -49,7 +41,7 @@ function NotConfiguredNotice() {
 }
 
 export default function AdminLogin() {
-  const { signIn, supabaseConfigured } = useAdminAuth();
+  const { signIn, authConfigured } = useAdminAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [reveal, setReveal] = useState(false);
@@ -150,17 +142,17 @@ export default function AdminLogin() {
               </p>
             )}
 
-            <AdminButton variant="primary" type="submit" className="w-full" disabled={busy || !supabaseConfigured}>
+            <AdminButton variant="primary" type="submit" className="w-full" disabled={busy || !authConfigured}>
               {busy ? <LoaderCircle size={15} className="animate-spin" /> : <KeyRound size={15} />}
               {busy ? "Signing in…" : "Sign in"}
             </AdminButton>
           </form>
 
-          {!supabaseConfigured && <NotConfiguredNotice />}
+          {!authConfigured && <NotConfiguredNotice />}
 
           <div className="mt-6 flex items-center justify-between text-[11px] text-white/35">
             <span className="inline-flex items-center gap-1.5">
-              <Lock size={12} /> Sessions are verified by Supabase
+              <Lock size={12} /> Sessions are verified by MongoDB
             </span>
             <Link to="/" className="hover:text-white/70">
               Back to site
@@ -169,10 +161,7 @@ export default function AdminLogin() {
         </div>
 
         <p className="mt-4 text-center text-[11px] leading-relaxed text-white/25">
-          Trouble signing in? Your account must exist in Supabase Auth and be listed in{" "}
-          <code className="font-mono">admin_operators</code>, have{" "}
-          <code className="font-mono">{'app_metadata.role = "admin"'}</code>, or be listed in{" "}
-          <code className="font-mono">ADMIN_ALLOWLIST_EMAILS</code>.
+          Trouble signing in? Your account must be active in the MongoDB <code className="font-mono">admin_operators</code> collection.
         </p>
       </div>
     </div>

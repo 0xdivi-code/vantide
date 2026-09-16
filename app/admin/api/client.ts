@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getRuntimeConfig } from "@/utils/runtime-config";
-import { getAdminAccessToken, notifyUnauthorized } from "@/admin/auth/supabase";
+import { getAdminAccessToken, notifyUnauthorized } from "@/admin/auth/session";
 
 export const ADMIN_API_CONFIG_KEY = "VITE_ADMIN_API_URL";
 
@@ -130,8 +130,8 @@ function createAbortSignal(
 /**
  * Make an authenticated request to the operator's backend.
  *
- * Authentication is a Supabase access token attached as `Authorization:
- * Bearer …` (see app/admin/auth/supabase.ts). Cookies are still sent for
+ * Authentication is a admin session token attached as `Authorization:
+ * Bearer …` (see app/admin/auth/session.ts). Cookies are still sent for
  * backends that prefer them. Do not put API secrets in a VITE_ variable:
  * all VITE values are shipped to every browser.
  */

@@ -6,8 +6,8 @@
  * (`VITE_ADMIN_API_URL: "/api/admin"` in public/config.js).
  *
  * Deploy notes:
- *   - Set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SUPABASE_JWT_SECRET as
- *     *server* environment variables in the Vercel project settings.
+ *   - Set MONGODB_URI, MONGODB_DATABASE and bootstrap credentials as
+ *     server environment variables in the Vercel project settings.
  *   - Add ADMIN_API_ALLOWED_ORIGINS if the dapp is served from a different
  *     origin than this API.
  */

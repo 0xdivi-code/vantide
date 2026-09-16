@@ -1,48 +1,27 @@
 # Vantide
 
-Vantide perpetual DEX frontend.
-
-## Quick start
+Vantide is an Orderly-based trading application with a private operator console.
 
 ```bash
-yarn install
-yarn dev          # dapp + admin API on http://localhost:5173
+yarn
+yarn dev
+yarn typecheck
+yarn test:api
 ```
-
-Step-by-step local setup and Supabase connection guide:
-**[`docs/getting-started.md`](docs/getting-started.md)**
-
-## Handing this?
-
-**[`docs/client-setup-guide.md`](docs/client-setup-guide.md)** is a zero-terminal,
-click-by-click guide (GitHub → Supabase → Vercel). 
 
 ## Admin console
 
-`/admin` is the operator console. It is gated by a Supabase email + password
-sign-in (`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` in `public/config.js`)
-and reads private operational data from the bundled admin API at `/api/admin`:
+`/admin` uses MongoDB for operational data and email/password authentication. Sessions are random opaque tokens stored as SHA-256 hashes, so no JWT signing key or external auth service is required.
 
-- `server/admin/*` — the API (router, auth, data store, Node adapter)
-- `api/admin/[...path].ts` — Vercel serverless entrypoint
-- `vite-plugins/admin-api.ts` — serves the same API in `yarn dev` / `yarn preview`
-- `server/standalone.ts` — standalone Node server for static hosts (`yarn api:dev`)
-- `server/admin/supabase/schema.sql` — tables + RLS
-- `yarn test:api` — the API test-suite
+Configure the server with `MONGODB_URI`, `MONGODB_DATABASE`, `ADMIN_BOOTSTRAP_EMAIL`, and `ADMIN_BOOTSTRAP_PASSWORD`; see [.env.example](./.env.example). The browser only receives `VITE_ADMIN_API_URL=/api/admin`.
 
-Reference: [`docs/admin-data-api.md`](docs/admin-data-api.md)
+Key locations:
 
-## Development
+- `server/admin/router.ts` — framework-neutral API router
+- `server/admin/mongodb.ts` — pooled MongoDB connection
+- `server/admin/auth.ts` — scrypt passwords and opaque sessions
+- `server/admin/store.ts` — MongoDB resource access
+- `app/admin/auth/session.ts` — browser session client
+- `api/admin/[...path].ts` — Vercel adapter
 
-```bash
-yarn install
-yarn dev            # dapp + /api/admin on http://localhost:5173
-yarn api:dev        # admin API only, on http://0.0.0.0:8787
-yarn api:token you@example.com   # mint an admin token for curl
-yarn test:api       # admin API tests
-yarn typecheck
-yarn build
-```
-
-Server-side secrets go in `.env.local` (see `.env.example`) — never in
-`public/config.js` or any `VITE_` variable, which ship to every browser.
+Full setup: [Getting started](./docs/getting-started.md) · [Admin API](./docs/admin-data-api.md)

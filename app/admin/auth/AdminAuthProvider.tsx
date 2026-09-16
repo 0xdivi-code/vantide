@@ -1,5 +1,5 @@
 /**
- * React bindings for the admin Supabase session.
+ * React bindings for the admin admin session.
  *
  * `AdminLayout` renders the login screen while `status === "signed-out"` and
  * the console while `status === "signed-in"`. The API client reads the same
@@ -21,13 +21,13 @@ import {
   getAdminSession,
   handleUnauthorized,
   isSessionExpired,
-  isSupabaseAuthConfigured,
+  isAdminAuthConfigured,
   refreshSession,
   signInWithPassword,
   signOut as signOutSession,
   subscribeAdminAuth,
   type AdminSession,
-} from "./supabase";
+} from "./session";
 
 export { ADMIN_UNAUTHORIZED_EVENT };
 
@@ -38,8 +38,8 @@ export interface AdminAuthValue {
   session: AdminSession | null;
   email: string | undefined;
   role: string | undefined;
-  /** False when VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are missing. */
-  supabaseConfigured: boolean;
+  /** False when the admin API URL is missing. */
+  authConfigured: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -50,7 +50,7 @@ const AdminAuthContext = createContext<AdminAuthValue | undefined>(undefined);
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AdminSession | null>(null);
   const [status, setStatus] = useState<AdminAuthStatus>("checking");
-  const supabaseConfigured = isSupabaseAuthConfigured();
+  const authConfigured = isAdminAuthConfigured();
 
   useEffect(() => {
     let cancelled = false;
@@ -102,12 +102,12 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       session,
       email: session?.user.email,
       role: session?.user.role,
-      supabaseConfigured,
+      authConfigured,
       signIn,
       signOut,
       refresh,
     }),
-    [status, session, supabaseConfigured, signIn, signOut, refresh]
+    [status, session, authConfigured, signIn, signOut, refresh]
   );
 
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>;

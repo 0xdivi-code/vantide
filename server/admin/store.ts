@@ -2,7 +2,7 @@
  * Data access for the admin resources.
  *
  * Two interchangeable backends behind one interface:
- *   - Supabase Postgres through PostgREST (production)
+ *   - MongoDB (production)
  *   - an in-process store seeded from `seed.ts` (zero-config / local dev),
  *     optionally persisted to `ADMIN_DATA_FILE`
  *
@@ -12,10 +12,9 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { AdminApiEnv } from "./env";
-import { supabaseEnabled } from "./env";
+import { mongoEnabled, mongoCollection } from "./mongodb";
 import { buildSeedData, type Row } from "./seed";
-import { insertRow, patchRow, selectRows } from "./supabase";
-import { badRequest, notFound } from "./types";
+import { notFound } from "./types";
 
 export const RESOURCES = [
   "users",
@@ -38,7 +37,7 @@ export function isResourceName(value: string): value is ResourceName {
   return (RESOURCES as readonly string[]).includes(value);
 }
 
-/** resource → Postgres table (see server/admin/supabase/schema.sql) */
+/** resource → MongoDB collection */
 export const RESOURCE_TABLES: Record<ResourceName, string> = {
   users: "admin_users",
   kyc: "admin_kyc",
@@ -102,7 +101,7 @@ export interface ListResult {
   total: number | undefined;
   limit: number;
   offset: number;
-  store: "supabase" | "memory";
+  store: "mongodb" | "memory";
   updated_at: number;
 }
 
@@ -203,26 +202,19 @@ export async function listResource(
   resource: ResourceName,
   params: ListParams
 ): Promise<ListResult> {
-  if (supabaseEnabled(env)) {
-    const { rows, count } = await selectRows(env, RESOURCE_TABLES[resource], {
-      select: "*",
-      filters: params.filters,
-      order: params.order,
-      limit: params.limit,
-      offset: params.offset,
-      countExact: true,
-    });
-    const filtered = params.q
-      ? rows.filter((row) => matchesSearch(row, params.q!.toLowerCase()))
-      : rows;
-    return {
-      rows: filtered,
-      total: params.q ? undefined : count ?? filtered.length,
-      limit: params.limit,
-      offset: params.offset,
-      store: "supabase",
-      updated_at: Date.now(),
-    };
+  if (mongoEnabled(env)) {
+    const collection = await mongoCollection<Row>(env, RESOURCE_TABLES[resource]);
+    const filter: Record<string, unknown> = { ...params.filters };
+    const [column, direction = "asc"] = (params.order ?? "").split(".");
+    let cursor = collection.find(filter, { projection: { _id: 0 } });
+    if (column) cursor = cursor.sort({ [column]: direction === "asc" ? 1 : -1 });
+    if (params.q) {
+      const needle = params.q.trim().toLowerCase();
+      const matching = (await cursor.toArray()).filter((row) => matchesSearch(row, needle));
+      return { rows: matching.slice(params.offset, params.offset + params.limit), total: matching.length, limit: params.limit, offset: params.offset, store: "mongodb", updated_at: Date.now() };
+    }
+    const [rows, total] = await Promise.all([cursor.skip(params.offset).limit(params.limit).toArray(), collection.countDocuments(filter)]);
+    return { rows, total, limit: params.limit, offset: params.offset, store: "mongodb", updated_at: Date.now() };
   }
 
   const table = loadSnapshot(env).tables[resource] ?? [];
@@ -244,13 +236,8 @@ export async function findRow(
   resource: ResourceName,
   id: string
 ): Promise<Row | undefined> {
-  if (supabaseEnabled(env)) {
-    const { rows } = await selectRows(env, RESOURCE_TABLES[resource], {
-      select: "*",
-      filters: { id },
-      limit: 1,
-    });
-    return rows[0];
+  if (mongoEnabled(env)) {
+    return (await (await mongoCollection<Row>(env, RESOURCE_TABLES[resource])).findOne({ id }, { projection: { _id: 0 } })) ?? undefined;
   }
   return (loadSnapshot(env).tables[resource] ?? []).find((row) => String(row.id) === id);
 }
@@ -264,10 +251,10 @@ export async function createRow(
   resource: ResourceName,
   values: Row
 ): Promise<Row> {
-  if (supabaseEnabled(env)) {
-    const created = await insertRow(env, RESOURCE_TABLES[resource], values);
-    if (!created) throw badRequest("Supabase did not return the created record.");
-    return created;
+  if (mongoEnabled(env)) {
+    const row: Row = { id: values.id ?? `${resource.slice(0, 3)}_${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`, ...values, created_at: values.created_at ?? Date.now() };
+    await (await mongoCollection<Row>(env, RESOURCE_TABLES[resource])).insertOne(row);
+    return row;
   }
 
   const store = loadSnapshot(env);
@@ -288,10 +275,12 @@ export async function updateRow(
   id: string,
   patch: Row
 ): Promise<Row> {
-  if (supabaseEnabled(env)) {
-    const updated = await patchRow(env, RESOURCE_TABLES[resource], { id }, { ...patch, updated_at: new Date().toISOString() });
-    if (!updated) throw notFound(`No ${resource} record with id "${id}".`);
-    return updated;
+  if (mongoEnabled(env)) {
+    const result = await (await mongoCollection<Row>(env, RESOURCE_TABLES[resource])).findOneAndUpdate(
+      { id }, { $set: { ...patch, updated_at: Date.now() } }, { returnDocument: "after", projection: { _id: 0 } }
+    );
+    if (!result) throw notFound(`No ${resource} record with id "${id}".`);
+    return result;
   }
 
   const store = loadSnapshot(env);
@@ -308,15 +297,15 @@ export async function updateRow(
 /* Audit log                                                          */
 /* ------------------------------------------------------------------ */
 
-export function recordAudit(
+export async function recordAudit(
   env: AdminApiEnv,
   entry: Omit<AuditEntry, "id" | "ts">
-): AuditEntry {
-  const record: AuditEntry = {
-    id: `aud_${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`,
-    ts: Date.now(),
-    ...entry,
-  };
+): Promise<AuditEntry> {
+  const record: AuditEntry = { id: `aud_${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`, ts: Date.now(), ...entry };
+  if (mongoEnabled(env)) {
+    await (await mongoCollection<AuditEntry>(env, "admin_audit")).insertOne(record);
+    return record;
+  }
   const store = loadSnapshot(env);
   store.audit.unshift(record);
   if (store.audit.length > 500) store.audit.length = 500;
@@ -324,6 +313,7 @@ export function recordAudit(
   return record;
 }
 
-export function readAudit(env: AdminApiEnv, limit = 50): AuditEntry[] {
+export async function readAudit(env: AdminApiEnv, limit = 50): Promise<AuditEntry[]> {
+  if (mongoEnabled(env)) return (await mongoCollection<AuditEntry>(env, "admin_audit")).find({}, { projection: { _id: 0 } }).sort({ ts: -1 }).limit(limit).toArray();
   return loadSnapshot(env).audit.slice(0, limit);
 }
