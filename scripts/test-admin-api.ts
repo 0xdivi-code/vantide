@@ -11,31 +11,21 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { handleAdminRequest } from "../server/admin/router";
-import { signHs256 } from "../server/admin/jwt";
 import { readAdminApiEnv, type AdminApiEnv } from "../server/admin/env";
 import { RESOURCES, resetMemoryStore } from "../server/admin/store";
 import type { AdminRequest, AdminResponse } from "../server/admin/types";
 
-const JWT_SECRET = "test-only-supabase-jwt-secret";
 const API_KEY = "test-only-admin-api-key";
 
 function env(overrides: Record<string, string | undefined> = {}): AdminApiEnv {
   return readAdminApiEnv({
     NODE_ENV: "test",
-    SUPABASE_JWT_SECRET: JWT_SECRET,
     ADMIN_API_KEY: API_KEY,
-    ADMIN_ALLOWLIST_EMAILS: "allowlisted@vantide.io",
     ...overrides,
   });
 }
 
-function adminToken(email = "ops@vantide.io", appMetadata: Record<string, unknown> = { role: "admin" }) {
-  return signHs256(
-    { sub: `user_${email}`, email, role: "authenticated", app_metadata: appMetadata },
-    JWT_SECRET,
-    { expiresInSec: 600 }
-  );
-}
+function adminToken() { return "use-service-key"; }
 
 async function call(
   path: string,
@@ -55,7 +45,7 @@ async function call(
   });
 
   const headers: Record<string, string> = { ...(init.headers ?? {}) };
-  if (init.token) headers.authorization = `Bearer ${init.token}`;
+  if (init.token) headers["x-admin-api-key"] = API_KEY;
   if (init.apiKey) headers["x-admin-api-key"] = init.apiKey;
 
   const request: AdminRequest = {
@@ -90,7 +80,7 @@ test("GET /health is public and reports the active store", async () => {
   assert.equal(response.body.success, true);
   assert.equal(response.body.data.status, "ok");
   assert.equal(response.body.data.store, "memory");
-  assert.equal(response.body.data.jwtVerification, true);
+  assert.equal(response.body.data.auth, "opaque-session");
 });
 
 test("GET / describes the endpoint surface", async () => {
@@ -108,47 +98,12 @@ test("private resources reject anonymous callers with 401", async () => {
   assert.equal(response.body.code, "UNAUTHORIZED");
 });
 
-test("tokens signed with another secret are rejected", async () => {
-  reset();
-  const foreign = signHs256({ sub: "x", email: "ops@vantide.io", app_metadata: { role: "admin" } }, "wrong-secret");
-  const response = await call("/users", { token: foreign });
+test("unknown opaque session tokens are rejected", async () => {
+  const response = await call("/users", { headers: { authorization: "Bearer unknown" } });
   assert.equal(response.status, 401);
 });
 
-test("expired tokens are rejected", async () => {
-  reset();
-  const expired = signHs256(
-    { sub: "x", email: "ops@vantide.io", app_metadata: { role: "admin" } },
-    JWT_SECRET,
-    { expiresInSec: -60, issuedAt: Math.floor(Date.now() / 1000) - 3600 }
-  );
-  const response = await call("/users", { token: expired });
-  assert.equal(response.status, 401);
-});
-
-test("signed-in users without operator access get 403", async () => {
-  reset();
-  const response = await call("/users", { token: adminToken("customer@example.com", {}) });
-  assert.equal(response.status, 403);
-  assert.equal(response.body.code, "FORBIDDEN");
-});
-
-test("allowlisted emails are granted access", async () => {
-  reset();
-  const response = await call("/me", { token: adminToken("allowlisted@vantide.io", {}) });
-  assert.equal(response.status, 200);
-  assert.equal(response.body.data.email, "allowlisted@vantide.io");
-});
-
-test("app_metadata.role = admin is granted access", async () => {
-  reset();
-  const response = await call("/me", { token: adminToken() });
-  assert.equal(response.status, 200);
-  assert.equal(response.body.data.authenticatedVia, "jwt");
-  assert.deepEqual(response.body.data.resources, [...RESOURCES]);
-});
-
-test("the machine API key works without a JWT", async () => {
+test("the machine API key works without a user session", async () => {
   reset();
   const response = await call("/overview", { apiKey: API_KEY });
   assert.equal(response.status, 200);
@@ -223,7 +178,7 @@ test("PATCH updates a record and writes an audit entry", async () => {
   assert.equal(audit.status, 200);
   assert.equal(audit.body.data.rows[0].action, "update");
   assert.equal(audit.body.data.rows[0].resource, "users");
-  assert.equal(audit.body.data.rows[0].actor, "ops@vantide.io");
+  assert.equal(audit.body.data.rows[0].actor, "service@local");
 });
 
 test("POST creates a record that shows up in the list", async () => {
@@ -293,7 +248,7 @@ test("overview aggregates the store", async () => {
   assert.ok(typeof data.support.open === "number");
 });
 
-test("the memory store can be disabled so a missing Supabase config fails loudly", async () => {
+test("the memory store can be disabled so a missing MongoDB config fails loudly", async () => {
   reset();
   const strict = env({ ADMIN_API_ALLOW_MEMORY_STORE: "false" });
   assert.equal(strict.allowMemoryStore, false);
@@ -305,16 +260,16 @@ test("the memory store can be disabled so a missing Supabase config fails loudly
 
 test("readAdminApiEnv normalises URLs, lists and flags", () => {
   const parsed = readAdminApiEnv({
-    SUPABASE_URL: "https://proj.supabase.co/",
-    SUPABASE_SERVICE_ROLE_KEY: " key ",
+    MONGODB_URI: "mongodb://localhost:27017",
+    MONGODB_DATABASE: " custom ",
     ADMIN_API_ALLOWED_ORIGINS: "https://a.example, https://b.example",
-    ADMIN_ALLOWLIST_EMAILS: "Ops@Vantide.io",
+    ADMIN_SESSION_TTL_HOURS: "12",
     ADMIN_API_REQUIRE_AUTH: "false",
   });
-  assert.equal(parsed.supabaseUrl, "https://proj.supabase.co");
-  assert.equal(parsed.supabaseServiceKey, "key");
+  assert.equal(parsed.mongodbUri, "mongodb://localhost:27017");
+  assert.equal(parsed.mongodbDatabase, "custom");
   assert.deepEqual(parsed.allowedOrigins, ["https://a.example", "https://b.example"]);
-  assert.deepEqual(parsed.allowlistEmails, ["ops@vantide.io"]);
+  assert.equal(parsed.sessionTtlHours, 12);
   assert.equal(parsed.requireAuth, false);
 });
 

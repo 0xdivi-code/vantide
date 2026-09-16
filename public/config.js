@@ -50,14 +50,10 @@ window.__RUNTIME_CONFIG__ = {
   // Admin panel (/admin). Set VITE_ADMIN_ENABLED to "false" to lock the
   // panel in production.
   VITE_ADMIN_ENABLED: "true",
-  // Supabase Auth (email + password) gates the admin panel. Leave both empty
-  // to fall back to VITE_ADMIN_PASSCODE. The anon key is safe for browsers;
-  // the service_role key and JWT secret belong on the server (.env.example).
-  VITE_SUPABASE_URL: "",
-  VITE_SUPABASE_ANON_KEY: "",
-  // "supabase" | "passcode" | "none". Empty = supabase when configured.
+  // Email/password auth and opaque sessions are served by the admin API.
+  // "mongodb" | "passcode" | "none". Empty = MongoDB auth when the API is configured.
   VITE_ADMIN_AUTH_MODE: "",
-  // Legacy fallback gate, used only when Supabase sign-in is not configured.
+  // Optional browser-only fallback for local development.
   VITE_ADMIN_PASSCODE: "",
   // Backend that serves private admin data. "/api/admin" is handled by
   // api/admin/[...path].ts in production and by the vite dev server locally.

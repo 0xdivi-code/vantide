@@ -6,7 +6,7 @@
  * list the dapp origin in `ADMIN_API_ALLOWED_ORIGINS`.
  *
  *   ADMIN_API_ALLOWED_ORIGINS=https://your-dapp.example \
- *   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... SUPABASE_JWT_SECRET=... \
+ *   MONGODB_URI=mongodb+srv://... ADMIN_BOOTSTRAP_EMAIL=... ADMIN_BOOTSTRAP_PASSWORD=... \
  *   npx tsx server/standalone.ts
  *
  * Listens on 0.0.0.0 so it works behind container proxies.
@@ -52,19 +52,8 @@ const server = createServer((req, res) => {
 server.listen(port, host, () => {
   console.log(`[admin-api] listening on http://${host}:${port}${base}`);
   console.log(`[admin-api] ${JSON.stringify(publicEnvSummary(env))}`);
-  if (!env.supabaseUrl) {
-    console.log("[admin-api] SUPABASE_URL is not set — serving the bundled memory store.");
-  }
-  if (!env.supabaseJwtSecret && !env.supabaseUrl && env.requireAuth) {
-    console.log(
-      "[admin-api] Neither SUPABASE_JWT_SECRET nor SUPABASE_URL is set — Supabase sign-ins will be rejected. " +
-        "Set SUPABASE_URL for new ES256 projects (JWKS), or SUPABASE_JWT_SECRET for legacy HS256 projects."
-    );
-  } else if (!env.supabaseJwtSecret && env.supabaseUrl) {
-    console.log("[admin-api] SUPABASE_JWT_SECRET not set — verifying ES256 tokens via JWKS from SUPABASE_URL.");
-  } else if (env.supabaseJwtSecret && !env.supabaseUrl) {
-    console.log("[admin-api] SUPABASE_URL not set — only HS256 tokens can be verified. Set SUPABASE_URL for ES256 (new projects).");
-  }
+  if (!env.mongodbUri) console.log("[admin-api] MONGODB_URI is not set — serving the bundled memory store; email login is unavailable.");
+  else console.log(`[admin-api] MongoDB database: ${env.mongodbDatabase}; opaque session auth enabled.`);
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

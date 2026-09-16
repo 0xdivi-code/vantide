@@ -4,7 +4,7 @@
  * middleware and the standalone Node server all share this exact code.
  */
 
-import { authenticate } from "./auth";
+import { authenticate, bearerToken, login, logout, refresh } from "./auth";
 import type { AdminApiEnv } from "./env";
 import { publicEnvSummary, readAdminApiEnv } from "./env";
 import {
@@ -177,7 +177,7 @@ async function patch(
   delete safe.id;
   delete safe.created_at;
   const updated = await updateRow(env, resource, id, safe);
-  recordAudit(env, {
+  await recordAudit(env, {
     actor: caller.email,
     action: "update",
     resource,
@@ -198,7 +198,7 @@ async function create(
     throw badRequest("Send a JSON object with the fields to create.");
   }
   const created = await createRow(env, resource, values);
-  recordAudit(env, {
+  await recordAudit(env, {
     actor: caller.email,
     action: "create",
     resource,
@@ -244,6 +244,26 @@ export async function route(
     throw methodNotAllowed(method);
   }
 
+  if (path === "/auth/login") {
+    if (method !== "POST") throw methodNotAllowed(method);
+    const body = asRecord(request.body);
+    const email = typeof body?.email === "string" ? body.email : "";
+    const password = typeof body?.password === "string" ? body.password : "";
+    if (!email || !password) throw badRequest("Email and password are required.");
+    return ok(await login(env, email, password));
+  }
+  if (path === "/auth/refresh") {
+    if (method !== "POST") throw methodNotAllowed(method);
+    const token = bearerToken(request.headers);
+    if (!token) throw unauthorized();
+    return ok(await refresh(env, token));
+  }
+  if (path === "/auth/logout") {
+    if (method !== "POST") throw methodNotAllowed(method);
+    await logout(env, bearerToken(request.headers));
+    return { status: 204, headers: {}, body: "" };
+  }
+
   if (PUBLIC_PATHS.has(path) || path === "/health") {
     if (method !== "GET") throw methodNotAllowed(method);
     if (path === "/") {
@@ -267,13 +287,13 @@ export async function route(
   }
 
   const caller = await authenticate(request.headers, env);
-  const dataMode: DataMode = env.supabaseUrl && env.supabaseServiceKey ? "supabase" : "memory";
+  const dataMode: DataMode = env.mongodbUri ? "mongodb" : "memory";
 
   if (dataMode === "memory" && !env.allowMemoryStore) {
     throw new AdminHttpError(
       503,
       "STORE_DISABLED",
-      "Supabase is not configured and ADMIN_API_ALLOW_MEMORY_STORE=false. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the server."
+      "MongoDB is not configured and ADMIN_API_ALLOW_MEMORY_STORE=false. Set MONGODB_URI on the server."
     );
   }
 
@@ -292,7 +312,7 @@ export async function route(
   if (path === "/audit") {
     if (method !== "GET") throw methodNotAllowed(method);
     const limit = Number(request.query.limit ?? "50");
-    return ok({ rows: readAudit(env, Number.isFinite(limit) ? limit : 50) }, { store: dataMode });
+    return ok({ rows: await readAudit(env, Number.isFinite(limit) ? limit : 50) }, { store: dataMode });
   }
 
   const match = matchRoute(path);

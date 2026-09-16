@@ -151,31 +151,13 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
       "Controls the local page-view tracker shown in the Analytics tab.",
   },
   {
-    key: "VITE_SUPABASE_URL",
-    label: "Supabase project URL",
-    group: "Admin Panel",
-    type: "url",
-    placeholder: "https://your-project.supabase.co",
-    description:
-      "Enables the email + password sign-in screen that protects /admin. Find it under Project Settings → API.",
-  },
-  {
-    key: "VITE_SUPABASE_ANON_KEY",
-    label: "Supabase anon key",
-    group: "Admin Panel",
-    type: "text",
-    placeholder: "eyJhbGciOi…",
-    description:
-      "The public anon key. Safe for browsers — the service_role key and JWT secret must stay in server environment variables only.",
-  },
-  {
     key: "VITE_ADMIN_AUTH_MODE",
     label: "Admin sign-in mode",
     group: "Admin Panel",
     type: "select",
     options: [
-      { value: "", label: "Automatic (Supabase when configured)" },
-      { value: "supabase", label: "Supabase email + password" },
+      { value: "", label: "Automatic (admin API auth)" },
+      { value: "mongodb", label: "MongoDB email + password" },
       { value: "passcode", label: "Passcode only" },
       { value: "none", label: "No gate (development)" },
     ],

@@ -30,17 +30,17 @@ export interface AdminCaller {
   id: string;
   email: string;
   role: string;
-  /** "jwt" when a Supabase access token was verified, "service" for the API key. */
-  via: "jwt" | "service";
+  /** "session" for a MongoDB-backed login, "service" for the API key. */
+  via: "session" | "service";
 }
 
 export interface AdminContext {
   caller: AdminCaller;
-  /** "supabase" when rows come from Postgres, "memory" for the bundled store. */
+  /** "mongodb" in production, "memory" for the bundled development store. */
   dataMode: DataMode;
 }
 
-export type DataMode = "supabase" | "memory";
+export type DataMode = "mongodb" | "memory";
 
 export type AdminHandler = (
   request: AdminRequest,

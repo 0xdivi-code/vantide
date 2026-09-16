@@ -30,16 +30,16 @@ const AUTH_KEY = "vantide-admin-unlocked";
 
 /**
  * Which gate protects /admin.
- *   supabase → email + password against Supabase Auth (default when configured)
+ *   mongodb  → email + password against the admin API (default when configured)
  *   passcode → the legacy VITE_ADMIN_PASSCODE lock screen
  *   none     → no gate (local development)
- *   ""       → supabase when configured, otherwise passcode when set
+ *   ""       → MongoDB auth when the admin API is configured
  */
-export type AdminAuthMode = "supabase" | "passcode" | "none" | "";
+export type AdminAuthMode = "mongodb" | "passcode" | "none" | "";
 
 function resolveAuthMode(): AdminAuthMode {
   const configured = (getRuntimeConfig("VITE_ADMIN_AUTH_MODE") ?? "").trim().toLowerCase();
-  if (configured === "supabase" || configured === "passcode" || configured === "none") {
+  if (configured === "mongodb" || configured === "passcode" || configured === "none") {
     return configured;
   }
   return "";
@@ -292,7 +292,7 @@ function NotificationsBell() {
 function AdminUserMenu() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { email, role, signOut, supabaseConfigured } = useAdminAuth();
+  const { email, role, signOut, authConfigured } = useAdminAuth();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -302,7 +302,7 @@ function AdminUserMenu() {
   const doSignOut = async () => {
     setBusy(true);
     try {
-      if (supabaseConfigured && email) await signOut();
+      if (authConfigured && email) await signOut();
     } finally {
       try {
         sessionStorage.removeItem(AUTH_KEY);
@@ -574,7 +574,7 @@ function AdminShell() {
 }
 
 function AdminGate() {
-  const { status, supabaseConfigured } = useAdminAuth();
+  const { status, authConfigured } = useAdminAuth();
   const [unlocked, setUnlocked] = useState<boolean>(() => {
     try {
       return sessionStorage.getItem(AUTH_KEY) === "1";
@@ -585,12 +585,12 @@ function AdminGate() {
 
   const passcode = getRuntimeConfig("VITE_ADMIN_PASSCODE");
   const mode = resolveAuthMode();
-  const useSupabase = mode === "supabase" || (mode === "" && supabaseConfigured);
+  const useEmailAuth = mode === "mongodb" || (mode === "" && authConfigured);
 
-  if (useSupabase) {
+  if (useEmailAuth) {
     if (status === "checking") return <AuthCheckingScreen />;
     if (status !== "signed-in") {
-      // Supabase is the requested gate but is not configured: show the login
+      // MongoDB is the requested gate but is not configured: show the login
       // screen anyway, it explains exactly what is missing.
       return <AdminLogin />;
     }

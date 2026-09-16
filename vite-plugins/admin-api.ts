@@ -6,8 +6,8 @@
  * same-origin by the dev server, so paths and CORS behave exactly like
  * production.
  *
- * Server-side variables (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
- * SUPABASE_JWT_SECRET, …) are read from `.env` / `.env.local` with Vite's own
+ * Server-side variables (MONGODB_URI, ADMIN_BOOTSTRAP_EMAIL, …) are read
+ * from `.env` / `.env.local` with Vite's own
  * `loadEnv`, because Vite only exposes `VITE_*` variables to the browser and
  * never writes `.env` files into `process.env`. Real environment variables
  * still win, so a shell export overrides the file.
@@ -56,8 +56,7 @@ export function adminApiPlugin(options: AdminApiPluginOptions = {}): Plugin {
   };
 
   const logStatus = (logger: { info: (msg: string) => void }) => {
-    const jwtMode = env.supabaseJwtSecret && env.supabaseUrl ? "hs256+jwks" : env.supabaseUrl ? "jwks" : env.supabaseJwtSecret ? "hs256" : "off";
-    logger.info(`  ➜  admin API  ${base} (${env.supabaseUrl ? "supabase" : "memory store"}, jwt ${jwtMode})`);
+    logger.info(`  ➜  admin API  ${base} (${env.mongodbUri ? "mongodb + opaque sessions" : "memory store"})`);
   };
 
   return {

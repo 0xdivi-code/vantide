@@ -1,11 +1,6 @@
 /**
- * Bundled fallback dataset.
- *
- * When Supabase credentials are not configured the API serves this store so
- * the admin panel is fully functional out of the box. Rows are generated
- * deterministically, so the numbers do not jump around between requests.
- * Set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` to switch every endpoint
- * to real Postgres tables (see `server/admin/supabase/schema.sql`).
+ * Realistic fake records for the zero-configuration local memory store.
+ * Set MONGODB_URI to use persistent MongoDB collections instead.
  */
 
 export type Row = Record<string, unknown>;
