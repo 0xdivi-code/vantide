@@ -13,7 +13,7 @@ yarn test:api
 
 `/admin` uses MongoDB for operational data and email/password authentication. Sessions are random opaque tokens stored as SHA-256 hashes, so no JWT signing key or external auth service is required.
 
-Configure the server with `MONGODB_URI`, `MONGODB_DATABASE`, `ADMIN_BOOTSTRAP_EMAIL`, and `ADMIN_BOOTSTRAP_PASSWORD`; see [.env.example](./.env.example). The browser only receives `VITE_ADMIN_API_URL=/api/admin`.
+Configure the server with `MONGODB_URI`, `MONGODB_DATABASE`, `ADMIN_BOOTSTRAP_EMAIL`, and `ADMIN_BOOTSTRAP_PASSWORD`; see [.env.example](./.env.example). The browser only receives `VITE_ADMIN_API_URL=/api/admin`. Empty resource collections are seeded once on first read (disable with `ADMIN_API_SEED_EMPTY=false`).
 
 Key locations:
 

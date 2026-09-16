@@ -36,6 +36,23 @@ export async function mongoCollection<T extends Document = Document>(
   return client.db(env.mongodbDatabase).collection<T>(name);
 }
 
+/** Operational collections that always carry an application-level `id`. */
+const RESOURCE_COLLECTIONS = [
+  "admin_users",
+  "admin_kyc",
+  "admin_treasury",
+  "admin_funding",
+  "admin_referrals",
+  "admin_rewards",
+  "admin_notifications",
+  "admin_cms",
+  "admin_fees",
+  "admin_security_events",
+  "admin_support_tickets",
+  "admin_system_flags",
+  "admin_audit",
+] as const;
+
 export async function ensureMongoIndexes(env: AdminApiEnv): Promise<void> {
   if (!mongoEnabled(env)) return;
   const [operators, sessions] = await Promise.all([
@@ -46,5 +63,9 @@ export async function ensureMongoIndexes(env: AdminApiEnv): Promise<void> {
     operators.createIndex({ email: 1 }, { unique: true }),
     sessions.createIndex({ tokenHash: 1 }, { unique: true }),
     sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    // Unique application ids keep concurrent first-run seeds from duplicating rows.
+    ...RESOURCE_COLLECTIONS.map(async (name) => {
+      await (await mongoCollection(env, name)).createIndex({ id: 1 }, { unique: true, sparse: true });
+    }),
   ]);
 }

@@ -21,6 +21,8 @@ The app and admin API run together. Open `/admin` for the operator console.
 
 MongoDB stores operational data, operator accounts, audit entries, and opaque login sessions. No JWT key is required.
 
+On first use, empty resource collections are filled once from the bundled seed data so admin tables are not blank. Disable with `ADMIN_API_SEED_EMPTY=false` when you only want live records.
+
 ## Commands
 
 ```bash
