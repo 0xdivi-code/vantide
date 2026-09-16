@@ -10,6 +10,7 @@ import { publicEnvSummary, readAdminApiEnv } from "./env";
 import {
   RESOURCES,
   createRow,
+  ensureMongoSeed,
   findRow,
   isResourceName,
   listResource,
@@ -59,7 +60,14 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 /* Handlers                                                           */
 /* ------------------------------------------------------------------ */
 
-function health(env: AdminApiEnv): AdminResponse {
+async function health(env: AdminApiEnv): Promise<AdminResponse> {
+  // Best-effort first-run seed so the first authenticated list is already warm.
+  // Failures are ignored here — list/detail still surface store errors.
+  try {
+    await ensureMongoSeed(env);
+  } catch {
+    /* health stays green even if Mongo is briefly unreachable */
+  }
   return ok(
     {
       status: "ok",
@@ -283,7 +291,7 @@ export async function route(
         ],
       });
     }
-    return health(env);
+    return await health(env);
   }
 
   const caller = await authenticate(request.headers, env);

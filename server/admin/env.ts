@@ -12,6 +12,8 @@ export interface AdminApiEnv {
   dataFile?: string;
   requireAuth: boolean;
   allowMemoryStore: boolean;
+  /** When true, empty MongoDB resource collections are filled once from seed.ts. */
+  seedEmptyCollections: boolean;
   nodeEnv: string;
 }
 type EnvSource = Record<string, string | undefined>;
@@ -31,11 +33,21 @@ export function readAdminApiEnv(source: EnvSource = process.env): AdminApiEnv {
     dataFile: source.ADMIN_DATA_FILE?.trim() || undefined,
     requireAuth: flag(source.ADMIN_API_REQUIRE_AUTH, true),
     allowMemoryStore: flag(source.ADMIN_API_ALLOW_MEMORY_STORE, true),
+    // Default on so a freshly provisioned MongoDB cluster shows the same
+    // operator-ready tables as the local memory store. Set
+    // ADMIN_API_SEED_EMPTY=false once you only want real operational data.
+    seedEmptyCollections: flag(source.ADMIN_API_SEED_EMPTY, true),
     nodeEnv: source.NODE_ENV ?? "development",
   };
 }
 export function publicEnvSummary(env: AdminApiEnv) {
-  return { mongoConfigured: Boolean(env.mongodbUri), auth: "opaque-session", authRequired: env.requireAuth, store: env.mongodbUri ? "mongodb" : "memory" };
+  return {
+    mongoConfigured: Boolean(env.mongodbUri),
+    auth: "opaque-session",
+    authRequired: env.requireAuth,
+    store: env.mongodbUri ? "mongodb" : "memory",
+    seedEmpty: env.seedEmptyCollections,
+  };
 }
 
 export function loadDotEnv(files = [".env.local", ".env"]): string[] {

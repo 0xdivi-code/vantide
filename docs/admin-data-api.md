@@ -36,6 +36,10 @@ The API maps resources to these collections:
 
 Every operational document needs a unique application-level `id` field. MongoDB's internal `_id` is not returned to the browser.
 
+### First-run seed
+
+When `ADMIN_API_SEED_EMPTY` is true (the default), the API inserts the bundled sample rows into any **empty** operational collection the first time it is read or written. Existing documents are never overwritten. Set `ADMIN_API_SEED_EMPTY=false` once the cluster only holds real operator data.
+
 ## Auth endpoints
 
 - `POST /api/admin/auth/login` with `{ "email": "…", "password": "…" }`

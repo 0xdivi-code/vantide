@@ -29,6 +29,8 @@ interface NormalizedResource {
   rows: RemoteRow[];
   total: number | undefined;
   updatedAt: number | undefined;
+  /** True when the payload used a known list envelope (rows/items/…) or was a bare array. */
+  isList: boolean;
 }
 
 const ROW_ARRAY_KEYS = ["rows", "items", "results", "records"];
@@ -63,9 +65,11 @@ function normalizeRows(value: unknown): NormalizedResource {
   let rowsValue: unknown[] = [];
   let total: number | undefined;
   let updatedAt: number | undefined;
+  let isList = false;
 
   if (Array.isArray(value)) {
     rowsValue = value;
+    isList = true;
   } else if (isRecord(value)) {
     let hasListEnvelope = false;
     for (const key of ROW_ARRAY_KEYS) {
@@ -87,6 +91,7 @@ function normalizeRows(value: unknown): NormalizedResource {
     // A detail record may itself contain arrays such as positions or roles.
     // Only a known list envelope should prevent it from being shown as a row.
     if (!hasListEnvelope) rowsValue = [value];
+    isList = hasListEnvelope;
 
     const totalCandidate = value.total ?? value.count ?? value.total_count;
     if (typeof totalCandidate === "number" && Number.isFinite(totalCandidate)) {
@@ -108,6 +113,7 @@ function normalizeRows(value: unknown): NormalizedResource {
       .map((row, index) => ({ ...row, id: rowIdentifier(row, index) })),
     total,
     updatedAt,
+    isList,
   };
 }
 
@@ -263,10 +269,21 @@ export function AdminResourcePage({
         </div>
       </div>
 
-      {columns.length === 0 ? (
+      {/*
+        Empty list envelopes (rows: []) are a successful, empty collection —
+        show the table empty state, not the “shape is wrong” message. The
+        shape warning is only for payloads that never produced a list at all
+        (and also yielded no scalar columns from a detail object).
+      */}
+      {columns.length === 0 && !(normalized.isList && normalized.rows.length === 0) ? (
         <EmptyDataState
           title="The API returned no tabular records"
           hint=" The raw endpoint is connected, but there is nothing to display in this view yet."
+        />
+      ) : columns.length === 0 && normalized.isList ? (
+        <EmptyDataState
+          title="No records returned"
+          hint="The connected API returned an empty collection. Seed or write operational data into this resource, then refresh."
         />
       ) : (
         <DataTable

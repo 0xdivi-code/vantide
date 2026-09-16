@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 
 import { handleAdminRequest } from "../server/admin/router";
 import { readAdminApiEnv, type AdminApiEnv } from "../server/admin/env";
-import { RESOURCES, resetMemoryStore } from "../server/admin/store";
+import { RESOURCES, resetMemoryStore, resetMongoSeedState } from "../server/admin/store";
 import type { AdminRequest, AdminResponse } from "../server/admin/types";
 
 const API_KEY = "test-only-admin-api-key";
@@ -70,6 +70,7 @@ async function call(
 
 function reset() {
   resetMemoryStore();
+  resetMongoSeedState();
 }
 
 /* ------------------------------------------------------------------ */
@@ -265,12 +266,16 @@ test("readAdminApiEnv normalises URLs, lists and flags", () => {
     ADMIN_API_ALLOWED_ORIGINS: "https://a.example, https://b.example",
     ADMIN_SESSION_TTL_HOURS: "12",
     ADMIN_API_REQUIRE_AUTH: "false",
+    ADMIN_API_SEED_EMPTY: "false",
   });
   assert.equal(parsed.mongodbUri, "mongodb://localhost:27017");
   assert.equal(parsed.mongodbDatabase, "custom");
   assert.deepEqual(parsed.allowedOrigins, ["https://a.example", "https://b.example"]);
   assert.equal(parsed.sessionTtlHours, 12);
   assert.equal(parsed.requireAuth, false);
+  assert.equal(parsed.seedEmptyCollections, false);
+  // Default is true so a fresh MongoDB cluster is not blank on first open.
+  assert.equal(readAdminApiEnv({ NODE_ENV: "test" }).seedEmptyCollections, true);
 });
 
 test("loadDotEnv parses .env files without overriding real environment variables", async (t) => {

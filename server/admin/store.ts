@@ -12,7 +12,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { AdminApiEnv } from "./env";
-import { mongoEnabled, mongoCollection } from "./mongodb";
+import { ensureMongoIndexes, mongoEnabled, mongoCollection } from "./mongodb";
 import { buildSeedData, type Row } from "./seed";
 import { notFound } from "./types";
 
@@ -194,6 +194,94 @@ function sortRows(rows: Row[], order: string | undefined): Row[] {
 }
 
 /* ------------------------------------------------------------------ */
+/* MongoDB first-run seed                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Tracks which (uri, database) pairs we already attempted to seed this
+ * process lifetime so empty-collection checks stay cheap after startup.
+ */
+const seededDatabases = new Set<string>();
+let seeding: Promise<void> | undefined;
+
+function seedKey(env: AdminApiEnv): string {
+  return `${env.mongodbUri ?? ""}::${env.mongodbDatabase}`;
+}
+
+function isDuplicateKeyError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as {
+    code?: number;
+    codeName?: string;
+    writeErrors?: Array<{ code?: number }>;
+  };
+  if (record.code === 11000 || record.codeName === "DuplicateKey") return true;
+  return Array.isArray(record.writeErrors) && record.writeErrors.some((entry) => entry?.code === 11000);
+}
+
+/**
+ * Insert seed rows into any operational collection that is still empty.
+ * Never overwrites existing documents — once an operator writes real data
+ * the collection stays authoritative.
+ */
+export async function ensureMongoSeed(env: AdminApiEnv): Promise<void> {
+  if (!mongoEnabled(env) || !env.seedEmptyCollections) return;
+  const key = seedKey(env);
+  if (seededDatabases.has(key)) return;
+  if (seeding) {
+    await seeding;
+    return;
+  }
+
+  seeding = (async () => {
+    // Indexes first so concurrent seeds cannot double-insert the same `id`.
+    await ensureMongoIndexes(env);
+
+    const seed = buildSeedData();
+    const inserted: string[] = [];
+    await Promise.all(
+      RESOURCES.map(async (resource) => {
+        const collection = await mongoCollection<Row>(env, RESOURCE_TABLES[resource]);
+        const count = await collection.countDocuments({}, { limit: 1 });
+        if (count > 0) return;
+        const rows = seed[resource] ?? [];
+        if (rows.length === 0) return;
+        try {
+          // ordered:false so a partial unique-index collision cannot abort the batch
+          await collection.insertMany(rows, { ordered: false });
+          inserted.push(resource);
+        } catch (error) {
+          // Duplicate key from a racing peer is fine — the collection is no longer empty.
+          if (!isDuplicateKeyError(error)) throw error;
+        }
+      })
+    );
+    if (inserted.length > 0) {
+      console.info(
+        `[admin-api] seeded empty MongoDB collections (${env.mongodbDatabase}): ${inserted.join(", ")}`
+      );
+    }
+    seededDatabases.add(key);
+  })()
+    .catch((error) => {
+      // Allow a later request to retry if the first attempt failed (e.g. brief Atlas blip).
+      console.warn("[admin-api] MongoDB seed failed:", error);
+      throw error;
+    })
+    .finally(() => {
+      seeding = undefined;
+    });
+
+  await seeding;
+}
+
+/** Test helper: clear the in-process “already seeded” memo. */
+export function resetMongoSeedState(): void {
+  seededDatabases.clear();
+  seeding = undefined;
+}
+
+/* ------------------------------------------------------------------ */
 /* Read                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -203,6 +291,7 @@ export async function listResource(
   params: ListParams
 ): Promise<ListResult> {
   if (mongoEnabled(env)) {
+    await ensureMongoSeed(env);
     const collection = await mongoCollection<Row>(env, RESOURCE_TABLES[resource]);
     const filter: Record<string, unknown> = { ...params.filters };
     const [column, direction = "asc"] = (params.order ?? "").split(".");
@@ -237,6 +326,7 @@ export async function findRow(
   id: string
 ): Promise<Row | undefined> {
   if (mongoEnabled(env)) {
+    await ensureMongoSeed(env);
     return (await (await mongoCollection<Row>(env, RESOURCE_TABLES[resource])).findOne({ id }, { projection: { _id: 0 } })) ?? undefined;
   }
   return (loadSnapshot(env).tables[resource] ?? []).find((row) => String(row.id) === id);
@@ -252,6 +342,9 @@ export async function createRow(
   values: Row
 ): Promise<Row> {
   if (mongoEnabled(env)) {
+    // Seed sibling collections first so overview/list screens stay consistent
+    // after the first mutation on a brand-new database.
+    await ensureMongoSeed(env);
     const row: Row = { id: values.id ?? `${resource.slice(0, 3)}_${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`, ...values, created_at: values.created_at ?? Date.now() };
     await (await mongoCollection<Row>(env, RESOURCE_TABLES[resource])).insertOne(row);
     return row;
@@ -276,6 +369,7 @@ export async function updateRow(
   patch: Row
 ): Promise<Row> {
   if (mongoEnabled(env)) {
+    await ensureMongoSeed(env);
     const result = await (await mongoCollection<Row>(env, RESOURCE_TABLES[resource])).findOneAndUpdate(
       { id }, { $set: { ...patch, updated_at: Date.now() } }, { returnDocument: "after", projection: { _id: 0 } }
     );
