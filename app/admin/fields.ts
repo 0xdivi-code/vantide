@@ -120,7 +120,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   },
   {
     key: "VITE_ENABLE_CAMPAIGNS",
-    label: "Enable campaigns menu ($ORDER)",
+    label: "Enable campaigns menu ()",
     group: "Feature Flags",
     type: "boolean",
   },
@@ -207,7 +207,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
     label: "Vantide API URL override",
     group: "Advanced",
     type: "url",
-    placeholder: "https://api.orderly.org",
+    placeholder: "https://api.vantide.xyz",
     description:
       "Optional API/proxy override for the live admin market queries. Leave empty to follow the frontend's selected Vantide network.",
   },

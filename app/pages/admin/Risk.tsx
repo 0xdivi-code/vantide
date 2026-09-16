@@ -133,7 +133,7 @@ export default function AdminRisk() {
   if (query.isLoading && !snapshot) {
     return (
       <div className="space-y-5">
-        <PageHeader title="Risk Monitor" description="Loading public open-position data from the selected Orderly network." />
+        <PageHeader title="Risk Monitor" description="Loading public open-position data from the selected Vantide network." />
         <LoadingDataState />
       </div>
     );

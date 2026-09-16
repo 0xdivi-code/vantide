@@ -210,7 +210,7 @@ function orderlySourceLabel(): string {
   if (normalizeApiBase(getRuntimeConfig("VITE_ORDERLY_API_URL"))) {
     return "Configured Orderly public API";
   }
-  return `Orderly ${getOrderlyApiBaseUrl().includes("testnet") ? "testnet" : "mainnet"} public API`;
+  return `Vantide ${getOrderlyApiBaseUrl().includes("mainnet") ? "mainnet" : "mainnet"} API`;
 }
 
 function orderlyEndpoint(path: string): string {

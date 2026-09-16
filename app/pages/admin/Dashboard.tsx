@@ -166,7 +166,7 @@ export default function AdminDashboard() {
     <div className="space-y-5">
       <PageHeader
         title="Exchange Overview"
-        description="Live market telemetry for the same symbols and network used by the trading frontend. Refreshes automatically without locally generated demo records."
+        description="Live market telemetry for the same symbols and network used by the trading frontend."
         actions={
           <Link to="/admin/pairs">
             <AdminButton variant="primary">

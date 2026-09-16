@@ -266,7 +266,7 @@ export function AdminResourcePage({
       {columns.length === 0 ? (
         <EmptyDataState
           title="The API returned no tabular records"
-          hint="Return an array, or an object with rows, items, results, or records. The raw endpoint is connected, but there is nothing to display in this view yet."
+          hint=" The raw endpoint is connected, but there is nothing to display in this view yet."
         />
       ) : (
         <DataTable
