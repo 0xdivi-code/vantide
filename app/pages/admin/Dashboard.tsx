@@ -309,7 +309,7 @@ export default function AdminDashboard() {
               )}
               <div>
                 <div className="text-sm font-semibold text-white">Review public risk exposure</div>
-                <p className="mt-0.5 text-xs text-white/45">Live open positions when exposed by the selected Orderly network.</p>
+                <p className="mt-0.5 text-xs text-white/45">Live open positions when exposed by the selected Vantide network.</p>
               </div>
             </div>
           </Card>
