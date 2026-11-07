@@ -52,8 +52,13 @@ const server = createServer((req, res) => {
 server.listen(port, host, () => {
   console.log(`[admin-api] listening on http://${host}:${port}${base}`);
   console.log(`[admin-api] ${JSON.stringify(publicEnvSummary(env))}`);
-  if (!env.mongodbUri) console.log("[admin-api] MONGODB_URI is not set — serving the bundled memory store; email login is unavailable.");
-  else console.log(`[admin-api] MongoDB database: ${env.mongodbDatabase}; opaque session auth enabled.`);
+  if (!env.mongodbUri) {
+    if (env.allowMemoryStore) {
+      console.log(`[admin-api] MONGODB_URI is not set — serving the explicitly enabled memory store (demo seeds: ${env.seedEmptyCollections}); email login is unavailable.`);
+    } else {
+      console.log("[admin-api] MONGODB_URI is required: memory storage is disabled; private operational requests will fail closed.");
+    }
+  } else console.log(`[admin-api] MongoDB database: ${env.mongodbDatabase}; opaque session auth enabled.`);
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

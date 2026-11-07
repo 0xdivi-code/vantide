@@ -5,7 +5,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { withBasePath } from './utils/base-path';
-import { getRuntimeConfig } from './utils/runtime-config';
+import { getRuntimeConfig, loadSharedRuntimeConfig } from './utils/runtime-config';
 
 import './styles/index.css';
 
@@ -200,7 +200,8 @@ const router = createBrowserRouter([
   },
 ], { basename: basePath });
 
-loadRuntimeConfig().then(() => {
+loadRuntimeConfig().then(async () => {
+  await loadSharedRuntimeConfig();
   loadAnalytics();
   
   ReactDOM.createRoot(document.getElementById('root')!).render(

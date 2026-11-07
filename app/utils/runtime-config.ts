@@ -1,7 +1,12 @@
 // Runtime configuration utility
 // This allows reading config from window.__RUNTIME_CONFIG__ with fallbacks to import.meta.env
 
-import { getAdminOverrideValue } from "../admin/adminStore";
+import {
+  getAdminOverrideValue,
+  getSharedAdminOverrides,
+  setSharedAdminOverrides,
+} from "../admin/adminStore";
+import { sanitizeSharedRuntimeConfig } from "../../shared/runtime-config";
 
 declare global {
   interface Window {
@@ -11,9 +16,10 @@ declare global {
 
 /**
  * Get a configuration value. Resolution order:
- *   1. Admin panel overrides (localStorage, set via the /admin panel)
- *   2. window.__RUNTIME_CONFIG__ (public/config.js)
- *   3. build-time environment variables (import.meta.env)
+ *   1. Admin panel local previews (localStorage, this browser only)
+ *   2. Server-published safe overrides (all visitors)
+ *   3. window.__RUNTIME_CONFIG__ (public/config.js)
+ *   4. build-time environment variables (import.meta.env)
  *
  * An admin override of "" explicitly force-clears a value from a lower
  * priority source.
@@ -22,6 +28,11 @@ export function getRuntimeConfig(key: string): string | undefined {
   const adminValue = getAdminOverrideValue(key);
   if (adminValue !== undefined) {
     return adminValue === "" ? undefined : adminValue;
+  }
+
+  const sharedValue = getSharedAdminOverrides()[key];
+  if (sharedValue !== undefined && sharedValue !== "") {
+    return sharedValue;
   }
 
   if (typeof window !== "undefined" && window.__RUNTIME_CONFIG__) {
@@ -39,6 +50,66 @@ export function getRuntimeConfig(key: string): string | undefined {
   }
 
   return envValue;
+}
+
+export function applySharedRuntimeConfig(value: unknown): void {
+  const sanitized = sanitizeSharedRuntimeConfig(value);
+  const values: Record<string, string> = {};
+  Object.entries(sanitized).forEach(([key, item]) => {
+    if (typeof item === "string") values[key] = item;
+  });
+  setSharedAdminOverrides(values);
+}
+
+function sharedRuntimeConfigEndpoint(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const raw = getRuntimeConfig("VITE_ADMIN_API_URL")?.trim();
+  if (!raw) return undefined;
+  try {
+    const url = new URL(raw, window.location.href);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    url.search = "";
+    url.hash = "";
+    url.pathname = `${url.pathname.replace(/\/+$/, "")}/runtime-config`;
+    return raw.startsWith("/") && !raw.startsWith("//")
+      ? `${url.pathname}${url.search}`
+      : url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Load public, allowlisted frontend overrides before the first React render.
+ * Failure is intentionally non-fatal: static hosting and config.js remain a
+ * complete fallback. No credentials are sent on this public request.
+ */
+export async function loadSharedRuntimeConfig(timeoutMs = 3_000): Promise<boolean> {
+  const endpoint = sharedRuntimeConfigEndpoint();
+  if (!endpoint || typeof fetch !== "function") return false;
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      credentials: "omit",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) return false;
+    const payload = (await response.json()) as {
+      success?: boolean;
+      data?: { values?: unknown };
+    };
+    if (payload.success === false) return false;
+    applySharedRuntimeConfig(payload.data?.values);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    globalThis.clearTimeout(timeout);
+  }
 }
 
 /**

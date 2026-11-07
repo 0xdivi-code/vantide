@@ -9,6 +9,8 @@ This repository has two separate integrations:
 
 Set the broker ID, broker name, EOA address, enabled networks, wallet providers, branding, and links in `public/config.js`. Values in this file are public and shipped to every visitor; never place a database URI or password there.
 
+When the admin API is configured, Settings and Appearance can publish an allowlisted subset of branding, menu, SEO, theme, and symbol values for all visitors. These writes are authenticated, validated, and audited; the public frontend reads only that safe subset on startup. Broker identity, chain/wallet/admin credentials, API locations, and executable analytics markup cannot be published remotely and remain in deployment-controlled config.
+
 ## Admin API and MongoDB
 
 Create a MongoDB Atlas cluster or another reachable MongoDB deployment. Create a least-privilege database user and allow network access from the API deployment. Then configure these **server-side** variables:
@@ -19,7 +21,9 @@ MONGODB_DATABASE=vantide
 ADMIN_BOOTSTRAP_EMAIL=admin@example.com
 ADMIN_BOOTSTRAP_PASSWORD=use-a-long-random-password
 ADMIN_SESSION_TTL_HOURS=24
+NODE_ENV=production
 ADMIN_API_ALLOW_MEMORY_STORE=false
+ADMIN_API_SEED_EMPTY=false
 ```
 
 In `public/config.js`, leave only the browser-safe API location:

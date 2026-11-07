@@ -22,6 +22,7 @@ const flag = (value: string | undefined, fallback: boolean) => value == null || 
 
 export function readAdminApiEnv(source: EnvSource = process.env): AdminApiEnv {
   const ttl = Number(source.ADMIN_SESSION_TTL_HOURS ?? 24);
+  const isProduction = source.NODE_ENV === "production";
   return {
     mongodbUri: source.MONGODB_URI?.trim() || undefined,
     mongodbDatabase: source.MONGODB_DATABASE?.trim() || "vantide",
@@ -32,11 +33,10 @@ export function readAdminApiEnv(source: EnvSource = process.env): AdminApiEnv {
     allowedOrigins: list(source.ADMIN_API_ALLOWED_ORIGINS),
     dataFile: source.ADMIN_DATA_FILE?.trim() || undefined,
     requireAuth: flag(source.ADMIN_API_REQUIRE_AUTH, true),
-    allowMemoryStore: flag(source.ADMIN_API_ALLOW_MEMORY_STORE, true),
-    // Default on so a freshly provisioned MongoDB cluster shows the same
-    // operator-ready tables as the local memory store. Set
-    // ADMIN_API_SEED_EMPTY=false once you only want real operational data.
-    seedEmptyCollections: flag(source.ADMIN_API_SEED_EMPTY, true),
+    // Production must opt in to ephemeral storage and bundled demo records.
+    // Silent fallback makes an unconfigured deployment look operational.
+    allowMemoryStore: flag(source.ADMIN_API_ALLOW_MEMORY_STORE, !isProduction),
+    seedEmptyCollections: flag(source.ADMIN_API_SEED_EMPTY, !isProduction),
     nodeEnv: source.NODE_ENV ?? "development",
   };
 }

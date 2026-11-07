@@ -13,7 +13,9 @@ yarn test:api
 
 `/admin` uses MongoDB for operational data and email/password authentication. Sessions are random opaque tokens stored as SHA-256 hashes, so no JWT signing key or external auth service is required.
 
-Configure the server with `MONGODB_URI`, `MONGODB_DATABASE`, `ADMIN_BOOTSTRAP_EMAIL`, and `ADMIN_BOOTSTRAP_PASSWORD`; see [.env.example](./.env.example). The browser only receives `VITE_ADMIN_API_URL=/api/admin`. Empty resource collections are seeded once on first read (disable with `ADMIN_API_SEED_EMPTY=false`).
+Configure the server with `MONGODB_URI`, `MONGODB_DATABASE`, `ADMIN_BOOTSTRAP_EMAIL`, and `ADMIN_BOOTSTRAP_PASSWORD`; see [.env.example](./.env.example). The browser only receives `VITE_ADMIN_API_URL=/api/admin`. With `NODE_ENV=production`, memory storage and bundled demo seeds default to **off**; both require explicit opt-in for local/demo use.
+
+Settings and Appearance can publish an allowlisted set of browser-safe frontend values through `PATCH /api/admin/runtime-config`. Visitors read those values from the public, sanitized `GET /api/admin/runtime-config` endpoint on startup, with `public/config.js` as the static fallback. Publishes are authenticated and audited. Broker identity, chain/wallet/admin credentials, API endpoints, and executable analytics markup remain deployment-controlled. Local preview overrides still affect only the current browser.
 
 Key locations:
 

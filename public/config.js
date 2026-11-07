@@ -57,7 +57,7 @@ window.__RUNTIME_CONFIG__ = {
   VITE_ADMIN_PASSCODE: "",
   // Backend that serves private admin data. "/api/admin" is handled by
   // api/admin/[...path].ts in production and by the vite dev server locally.
-  // See docs/admin-api.md.
+  // See docs/admin-data-api.md.
   VITE_ADMIN_API_URL: "/api/admin",
   // Polling cadence for live public market telemetry (minimum 5000ms).
   VITE_ADMIN_LIVE_REFRESH_MS: "15000",

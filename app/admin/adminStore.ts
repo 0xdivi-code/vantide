@@ -1,15 +1,14 @@
 /**
  * Admin override store.
  *
- * The dapp reads its configuration at runtime from `window.__RUNTIME_CONFIG__`
- * (public/config.js) with fallbacks to build-time env vars (see
- * app/utils/runtime-config.ts). The admin panel layers a third, highest
- * priority source on top of that: overrides persisted in the browser's
- * localStorage. This lets an operator change branding, menus, feature flags,
- * etc. from the admin panel and see the result live, without redeploying.
+ * Configuration precedence is: local browser preview, server-published safe
+ * overrides, `window.__RUNTIME_CONFIG__` (public/config.js), then build-time
+ * env vars. Server values are supplied by runtime-config.ts after its public
+ * API request; this module only holds the sanitized in-memory map.
  *
- * To make changes permanent for every visitor, the merged configuration can
- * be exported as a `config.js` file and deployed to `public/config.js`.
+ * Local previews never leave the browser. Shared values are persisted by the
+ * admin API, and the merged configuration can also be exported as config.js
+ * for a static deployment.
  *
  * IMPORTANT: this module must not import runtime-config.ts (that module
  * imports this one). Keep it dependency-free.
@@ -61,6 +60,18 @@ function emitChange(): void {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(ADMIN_CONFIG_EVENT));
   }
+}
+
+let sharedOverrides: AdminOverrides = {};
+
+export function getSharedAdminOverrides(): AdminOverrides {
+  return { ...sharedOverrides };
+}
+
+/** Called only with the public API's allowlisted, string-only response. */
+export function setSharedAdminOverrides(values: AdminOverrides): void {
+  sharedOverrides = { ...values };
+  emitChange();
 }
 
 /* ------------------------------------------------------------------ */
@@ -143,6 +154,21 @@ export function removeAdminOverride(key: string): void {
   emitChange();
 }
 
+export function removeAdminOverrides(keys: string[]): void {
+  const overrides = getAdminOverrides();
+  let removed = 0;
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(overrides, key)) {
+      delete overrides[key];
+      removed += 1;
+    }
+  }
+  if (removed === 0) return;
+  writeJSON(OVERRIDES_KEY, overrides);
+  logHistory({ action: "remove", value: `${removed} published keys cleared from local preview` });
+  emitChange();
+}
+
 export function clearAdminOverrides(): void {
   writeJSON(OVERRIDES_KEY, {});
   logHistory({ action: "clear" });
@@ -201,6 +227,7 @@ export function generateConfigJs(): string {
   if (typeof window !== "undefined" && window.__RUNTIME_CONFIG__) {
     Object.assign(merged, window.__RUNTIME_CONFIG__);
   }
+  Object.assign(merged, sharedOverrides);
   Object.assign(merged, getAdminOverrides());
 
   const body = Object.entries(merged)

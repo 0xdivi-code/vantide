@@ -14,7 +14,23 @@ import {
   hasThemeOverrides,
   hexToTriplet,
 } from "@/admin/theme";
-import { setAdminOverride, removeAdminOverride, generateConfigJs } from "@/admin/adminStore";
+import {
+  setAdminOverride,
+  getAdminOverrideValue,
+  removeAdminOverride,
+  removeAdminOverrides,
+  generateConfigJs,
+  getSharedAdminOverrides,
+} from "@/admin/adminStore";
+import { applySharedRuntimeConfig } from "@/utils/runtime-config";
+import {
+  getAdminApiBaseUrl,
+  publishSharedRuntimeConfig,
+} from "@/admin/api/client";
+import {
+  isSharedRuntimeConfigKey,
+  type SharedRuntimeConfigChanges,
+} from "../../../shared/runtime-config";
 import { useConfigVersion } from "@/admin/useConfigVersion";
 import { Card, Badge, AdminButton } from "@/admin/components/ui";
 import { useToast } from "./feedback";
@@ -33,6 +49,48 @@ export function ThemeEditor() {
   useConfigVersion();
   const toast = useToast();
   const [, force] = useState(0);
+  const [publishing, setPublishing] = useState(false);
+  const sharedApiAvailable = Boolean(getAdminApiBaseUrl());
+
+  const publishTheme = async () => {
+    if (publishing) return;
+    setPublishing(true);
+    const changes: SharedRuntimeConfigChanges = {};
+    THEME_COLORS.forEach((definition) => {
+      if (isSharedRuntimeConfigKey(definition.key)) {
+        changes[definition.key] = effectiveColor(definition);
+      }
+    });
+    try {
+      const state = await publishSharedRuntimeConfig(changes);
+      removeAdminOverrides(THEME_COLORS.map((definition) => definition.key));
+      applySharedRuntimeConfig(state.values);
+      toast.success("Theme published. Visitors receive it on their next page load.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not publish theme.");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const clearSharedTheme = async () => {
+    if (publishing) return;
+    setPublishing(true);
+    const changes: SharedRuntimeConfigChanges = {};
+    THEME_COLORS.forEach((definition) => {
+      if (isSharedRuntimeConfigKey(definition.key)) changes[definition.key] = null;
+    });
+    try {
+      const state = await publishSharedRuntimeConfig(changes);
+      removeAdminOverrides(THEME_COLORS.map((definition) => definition.key));
+      applySharedRuntimeConfig(state.values);
+      toast.success("Shared theme overrides removed; deployed defaults are active.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not clear shared theme.");
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   const applyPreset = (presetName: string) => {
     const preset = THEME_PRESETS.find((p) => p.name === presetName);
@@ -55,15 +113,21 @@ export function ThemeEditor() {
 
   const resetAll = () => {
     THEME_COLORS.forEach((d) => removeAdminOverride(d.key));
-    toast.success("Theme reset to the default purple.", undefined);
+    toast.success("Local theme previews cleared; shared or deployed colors are restored.", undefined);
   };
 
   const custom = hasThemeOverrides();
+  const hasLocalTheme = THEME_COLORS.some(
+    (definition) => getAdminOverrideValue(definition.key) !== undefined
+  );
+  const hasSharedTheme = THEME_COLORS.some(
+    (definition) => getSharedAdminOverrides()[definition.key] !== undefined
+  );
 
   return (
     <Card
       title="Theme & button colors"
-      subtitle="Applies to the active dapp immediately. Export config.js to ship it to production."
+      subtitle="Color edits are local live previews. Publish the current theme for visitors, or export it in config.js for static hosting."
       actions={
         custom ? (
           <Badge tone="primary">
@@ -106,7 +170,7 @@ export function ThemeEditor() {
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {THEME_COLORS.map((def) => {
               const value = effectiveColor(def);
-              const overridden = value !== def.defaultHex;
+              const locallyOverridden = getAdminOverrideValue(def.key) !== undefined;
               return (
                 <div
                   key={def.key}
@@ -129,11 +193,11 @@ export function ThemeEditor() {
                     <div className="truncate text-xs font-medium text-white/75">{def.label}</div>
                     <div className="font-mono text-[10px] uppercase text-white/35">{value}</div>
                   </div>
-                  {overridden && (
+                  {locallyOverridden && (
                     <button
                       onClick={() => resetColor(def.key)}
                       className="shrink-0 rounded-md p-1 text-white/30 hover:bg-white/10 hover:text-white/70"
-                      title="Reset to default"
+                      title="Clear local preview"
                     >
                       <RotateCcw size={12} />
                     </button>
@@ -167,16 +231,29 @@ export function ThemeEditor() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <AdminButton variant="primary" onClick={() => download("config.js", generateConfigJs())}>
+          <AdminButton
+            variant="primary"
+            onClick={publishTheme}
+            disabled={publishing || !sharedApiAvailable}
+            title={sharedApiAvailable ? "Publish the effective theme for all visitors" : "Configure VITE_ADMIN_API_URL to publish"}
+          >
+            <Paintbrush size={15} /> {publishing ? "Publishing…" : "Publish current theme"}
+          </AdminButton>
+          <AdminButton onClick={() => download("config.js", generateConfigJs())}>
             <Download size={15} /> Export config.js with theme
           </AdminButton>
-          {custom && (
-            <AdminButton variant="danger" onClick={resetAll}>
-              <RotateCcw size={15} /> Reset theme
+          {hasSharedTheme && (
+            <AdminButton onClick={clearSharedTheme} disabled={publishing}>
+              <RotateCcw size={15} /> Clear shared theme
+            </AdminButton>
+          )}
+          {hasLocalTheme && (
+            <AdminButton variant="danger" onClick={resetAll} disabled={publishing}>
+              <RotateCcw size={15} /> Reset local preview
             </AdminButton>
           )}
           <span className="text-[11px] text-white/35">
-            Changes persist in this browser instantly; the export carries them to all visitors.
+            Shared updates are audited and apply on the next visitor page load. Local previews never leave this browser.
           </span>
         </div>
       </div>

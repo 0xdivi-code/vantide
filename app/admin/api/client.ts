@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getRuntimeConfig } from "@/utils/runtime-config";
 import { getAdminAccessToken, notifyUnauthorized } from "@/admin/auth/session";
+import type {
+  SharedRuntimeConfig,
+  SharedRuntimeConfigChanges,
+} from "../../../shared/runtime-config";
 
 export const ADMIN_API_CONFIG_KEY = "VITE_ADMIN_API_URL";
 
@@ -271,6 +275,31 @@ export async function getAdminResource<T>(
 ): Promise<T> {
   return adminRequest<T>(`${resource.replace(/^\/+/, "")}${buildQueryString(params)}`, {
     signal,
+  });
+}
+
+export interface SharedRuntimeConfigState {
+  values: SharedRuntimeConfig;
+  updated_at: number | null;
+  updated_by?: string;
+  store?: "mongodb" | "memory";
+}
+
+export function getSharedRuntimeConfigState(
+  signal?: AbortSignal
+): Promise<SharedRuntimeConfigState> {
+  return adminRequest<SharedRuntimeConfigState>("runtime-config", { signal });
+}
+
+export function publishSharedRuntimeConfig(
+  changes: SharedRuntimeConfigChanges,
+  signal?: AbortSignal
+): Promise<SharedRuntimeConfigState> {
+  return adminRequest<SharedRuntimeConfigState>("runtime-config", {
+    method: "PATCH",
+    body: { changes },
+    signal,
+    timeoutMs: 20_000,
   });
 }
 

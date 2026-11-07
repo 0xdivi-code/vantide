@@ -7,7 +7,9 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { handleAdminRequest, type HandleOptions } from "./router";
 import type { AdminRequest } from "./types";
 
-const MAX_BODY_BYTES = 1_000_000;
+// Allows an operator-published data-URL logo while still bounding request
+// memory. Runtime-config values have their own smaller per-key/total limits.
+const MAX_BODY_BYTES = 3_000_000;
 
 export async function readBody(req: IncomingMessage): Promise<unknown> {
   if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return undefined;

@@ -15,6 +15,12 @@ import type { AdminApiEnv } from "./env";
 import { ensureMongoIndexes, mongoEnabled, mongoCollection } from "./mongodb";
 import { buildSeedData, type Row } from "./seed";
 import { notFound } from "./types";
+import {
+  isSharedRuntimeConfigKey,
+  sanitizeSharedRuntimeConfig,
+  type SharedRuntimeConfig,
+  type SharedRuntimeConfigChanges,
+} from "../../shared/runtime-config";
 
 export const RESOURCES = [
   "users",
@@ -112,6 +118,21 @@ export interface ListResult {
 interface MemorySnapshot {
   tables: Record<string, Row[]>;
   audit: AuditEntry[];
+  runtimeConfig: RuntimeConfigDocument;
+}
+
+interface RuntimeConfigDocument {
+  id: "public";
+  values: SharedRuntimeConfig;
+  updated_at: number | null;
+  updated_by?: string;
+}
+
+export interface RuntimeConfigState {
+  values: SharedRuntimeConfig;
+  updated_at: number | null;
+  updated_by?: string;
+  store: "mongodb" | "memory";
 }
 
 export interface AuditEntry {
@@ -126,8 +147,21 @@ export interface AuditEntry {
 
 let snapshot: MemorySnapshot | undefined;
 
-function emptySnapshot(): MemorySnapshot {
-  return { tables: buildSeedData(), audit: [] };
+function emptyTables(seed: boolean): Record<string, Row[]> {
+  if (seed) return buildSeedData();
+  return Object.fromEntries(RESOURCES.map((resource) => [resource, []]));
+}
+
+function emptyRuntimeConfig(): RuntimeConfigDocument {
+  return { id: "public", values: {}, updated_at: null };
+}
+
+function emptySnapshot(env: AdminApiEnv): MemorySnapshot {
+  return {
+    tables: emptyTables(env.seedEmptyCollections),
+    audit: [],
+    runtimeConfig: emptyRuntimeConfig(),
+  };
 }
 
 function loadSnapshot(env: AdminApiEnv): MemorySnapshot {
@@ -136,15 +170,16 @@ function loadSnapshot(env: AdminApiEnv): MemorySnapshot {
     try {
       const parsed = JSON.parse(readFileSync(env.dataFile, "utf8")) as Partial<MemorySnapshot>;
       snapshot = {
-        tables: { ...buildSeedData(), ...(parsed.tables ?? {}) },
+        tables: { ...emptyTables(env.seedEmptyCollections), ...(parsed.tables ?? {}) },
         audit: Array.isArray(parsed.audit) ? parsed.audit : [],
+        runtimeConfig: parsed.runtimeConfig ?? emptyRuntimeConfig(),
       };
       return snapshot;
     } catch (error) {
-      console.warn(`[admin-api] could not read ${env.dataFile}, falling back to seed data:`, error);
+      console.warn(`[admin-api] could not read ${env.dataFile}, starting with an empty local store:`, error);
     }
   }
-  snapshot = emptySnapshot();
+  snapshot = emptySnapshot(env);
   return snapshot;
 }
 
@@ -385,6 +420,80 @@ export async function updateRow(
   table[index] = next;
   persistSnapshot(env);
   return next;
+}
+
+/* ------------------------------------------------------------------ */
+/* Shared browser-safe runtime configuration                          */
+/* ------------------------------------------------------------------ */
+
+const RUNTIME_CONFIG_COLLECTION = "admin_runtime_config";
+
+function runtimeConfigState(
+  document: RuntimeConfigDocument | null | undefined,
+  store: "mongodb" | "memory"
+): RuntimeConfigState {
+  return {
+    values: sanitizeSharedRuntimeConfig(document?.values),
+    updated_at: typeof document?.updated_at === "number" ? document.updated_at : null,
+    updated_by: document?.updated_by,
+    store,
+  };
+}
+
+export async function readRuntimeConfig(env: AdminApiEnv): Promise<RuntimeConfigState> {
+  if (mongoEnabled(env)) {
+    const collection = await mongoCollection<RuntimeConfigDocument>(env, RUNTIME_CONFIG_COLLECTION);
+    const document = await collection.findOne(
+      { id: "public" },
+      { projection: { _id: 0 } }
+    );
+    return runtimeConfigState(document, "mongodb");
+  }
+  return runtimeConfigState(loadSnapshot(env).runtimeConfig, "memory");
+}
+
+export async function updateRuntimeConfig(
+  env: AdminApiEnv,
+  changes: SharedRuntimeConfigChanges,
+  actor: string
+): Promise<RuntimeConfigState> {
+  const now = Date.now();
+  if (mongoEnabled(env)) {
+    await ensureMongoIndexes(env);
+    const collection = await mongoCollection<RuntimeConfigDocument>(env, RUNTIME_CONFIG_COLLECTION);
+    const set: Record<string, unknown> = { updated_at: now, updated_by: actor };
+    const unset: Record<string, ""> = {};
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === null) unset[`values.${key}`] = "";
+      else set[`values.${key}`] = value;
+    }
+    const document = await collection.findOneAndUpdate(
+      { id: "public" },
+      {
+        $set: set,
+        ...(Object.keys(unset).length > 0 ? { $unset: unset } : {}),
+        $setOnInsert: { id: "public" },
+      },
+      { upsert: true, returnDocument: "after", projection: { _id: 0 } }
+    );
+    return runtimeConfigState(document, "mongodb");
+  }
+
+  const store = loadSnapshot(env);
+  const values: SharedRuntimeConfig = { ...store.runtimeConfig.values };
+  for (const [key, value] of Object.entries(changes)) {
+    if (!isSharedRuntimeConfigKey(key)) continue;
+    if (value === null) delete values[key];
+    else if (typeof value === "string") values[key] = value;
+  }
+  store.runtimeConfig = {
+    id: "public",
+    values,
+    updated_at: now,
+    updated_by: actor,
+  };
+  persistSnapshot(env);
+  return runtimeConfigState(store.runtimeConfig, "memory");
 }
 
 /* ------------------------------------------------------------------ */

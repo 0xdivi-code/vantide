@@ -32,7 +32,7 @@ function NotConfiguredNotice() {
             then configure <code className="rounded bg-white/10 px-1 py-0.5">MONGODB_URI</code> on the server.
           </p>
           <p className="text-[11px] leading-relaxed text-white/40">
-            Then grant your account admin access — see <code className="rounded bg-white/10 px-1 py-0.5">docs/admin-api.md</code>.
+            Then grant your account admin access — see <code className="rounded bg-white/10 px-1 py-0.5">docs/admin-data-api.md</code>.
           </p>
         </div>
       </div>

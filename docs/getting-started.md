@@ -19,9 +19,9 @@ The app and admin API run together. Open `/admin` for the operator console.
 6. Restart `yarn dev`, then sign in at `/admin` with the bootstrap credentials.
 7. Once the operator exists, remove `ADMIN_BOOTSTRAP_PASSWORD` from the environment.
 
-MongoDB stores operational data, operator accounts, audit entries, and opaque login sessions. No JWT key is required.
+MongoDB stores operational data, operator accounts, audit entries, opaque login sessions, and allowlisted shared frontend settings. No JWT key is required.
 
-On first use, empty resource collections are filled once from the bundled seed data so admin tables are not blank. Disable with `ADMIN_API_SEED_EMPTY=false` when you only want live records.
+For local development only, `ADMIN_API_SEED_EMPTY=true` fills empty resource collections with bundled demo rows. Both demo seeding and memory storage default to **off** when `NODE_ENV=production`; do not opt in on a real deployment. The bundled rows are not Orderly, wallet, or chain records.
 
 ## Commands
 

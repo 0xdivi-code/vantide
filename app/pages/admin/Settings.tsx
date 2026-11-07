@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Save, Download, Upload, RotateCcw, Copy, Check } from "lucide-react";
 import { CONFIG_FIELDS, FIELD_GROUPS, KNOWN_MENU_ITEMS } from "@/admin/fields";
-import { getRuntimeConfig } from "@/utils/runtime-config";
+import { applySharedRuntimeConfig, getRuntimeConfig } from "@/utils/runtime-config";
 import {
   clearAdminHistory,
   clearAdminOverrides,
@@ -11,9 +11,18 @@ import {
   getAdminOverrideValue,
   importAdminOverrides,
   removeAdminOverride,
+  removeAdminOverrides,
   setAdminOverride,
 } from "@/admin/adminStore";
 import { useConfigVersion } from "@/admin/useConfigVersion";
+import {
+  getAdminApiBaseUrl,
+  publishSharedRuntimeConfig,
+} from "@/admin/api/client";
+import {
+  isSharedRuntimeConfigKey,
+  type SharedRuntimeConfigChanges,
+} from "../../../shared/runtime-config";
 import {
   Card,
   AdminButton,
@@ -74,8 +83,10 @@ export default function AdminSettings() {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [importText, setImportText] = useState("");
   const [copied, setCopied] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const overrides = getAdminOverrides();
+  const sharedApiAvailable = Boolean(getAdminApiBaseUrl());
 
   const effectiveValue = (key: string): string =>
     getRuntimeConfig(key) ?? "";
@@ -92,10 +103,12 @@ export default function AdminSettings() {
     [draft, configVersion]
   );
 
+  const sharedDirtyKeys = dirtyKeys.filter(isSharedRuntimeConfigKey);
+
   const setValue = (key: string, value: string) =>
     setDraft((d) => ({ ...d, [key]: value }));
 
-  const saveAll = () => {
+  const saveLocal = () => {
     if (dirtyKeys.length === 0) return;
     for (const key of dirtyKeys) {
       const result = setAdminOverride(key, draft[key]);
@@ -107,8 +120,36 @@ export default function AdminSettings() {
     setDraft({});
     show(
       "success",
-      `Saved ${dirtyKeys.length} setting${dirtyKeys.length > 1 ? "s" : ""}. Changes are live.`
+      `Saved ${dirtyKeys.length} local preview setting${dirtyKeys.length > 1 ? "s" : ""} in this browser.`
     );
+  };
+
+  const publishAll = async () => {
+    if (sharedDirtyKeys.length === 0 || publishing) return;
+    setPublishing(true);
+    const changes: SharedRuntimeConfigChanges = {};
+    for (const key of sharedDirtyKeys) {
+      // Empty fields remove the shared override and reveal config.js again.
+      changes[key] = draft[key] === "" ? null : draft[key];
+    }
+    try {
+      const state = await publishSharedRuntimeConfig(changes);
+      removeAdminOverrides(sharedDirtyKeys);
+      applySharedRuntimeConfig(state.values);
+      setDraft((current) => {
+        const next = { ...current };
+        sharedDirtyKeys.forEach((key) => delete next[key]);
+        return next;
+      });
+      show(
+        "success",
+        `Published ${sharedDirtyKeys.length} setting${sharedDirtyKeys.length > 1 ? "s" : ""} to ${state.store === "mongodb" ? "MongoDB" : "the development store"}. Visitors receive them on their next page load.`
+      );
+    } catch (error) {
+      show("error", error instanceof Error ? error.message : "Could not publish shared settings.");
+    } finally {
+      setPublishing(false);
+    }
   };
 
   const discardAll = () => setDraft({});
@@ -252,7 +293,7 @@ export default function AdminSettings() {
     <div className="space-y-6">
       <PageHeader
         title="Settings"
-        description="Edit the dapp's runtime configuration. Saved values are stored as admin overrides and applied live in this browser."
+        description="Publish allowlisted frontend settings for every visitor, or save a private preview in this browser. Deployment and security controls remain in config.js."
         actions={
           <>
             {dirtyKeys.length > 0 && (
@@ -261,19 +302,36 @@ export default function AdminSettings() {
               </AdminButton>
             )}
             <AdminButton
-              variant="primary"
-              onClick={saveAll}
-              disabled={dirtyKeys.length === 0}
+              onClick={saveLocal}
+              disabled={dirtyKeys.length === 0 || publishing}
             >
               <Save size={15} />
-              Save changes
+              Save local preview
               {dirtyKeys.length > 0 && ` (${dirtyKeys.length})`}
+            </AdminButton>
+            <AdminButton
+              variant="primary"
+              onClick={publishAll}
+              disabled={sharedDirtyKeys.length === 0 || publishing || !sharedApiAvailable}
+              title={sharedApiAvailable ? "Publish safe frontend values for all visitors" : "Configure VITE_ADMIN_API_URL to publish shared settings"}
+            >
+              <Save size={15} />
+              {publishing ? "Publishing…" : "Publish to visitors"}
+              {sharedDirtyKeys.length > 0 && ` (${sharedDirtyKeys.length})`}
             </AdminButton>
           </>
         }
       />
 
       <FlashBanner message={message} />
+
+      <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-xs leading-relaxed text-white/50">
+        {sharedApiAvailable ? (
+          <>Shared publishes are authenticated, stored by the admin API, and written to its audit log. Empty fields remove the shared override. Broker IDs, wallet/admin credentials, API endpoints, chain settings, and executable analytics code are not remotely writable.</>
+        ) : (
+          <>No admin API is configured, so only local previews and config.js export are available. Set <code>VITE_ADMIN_API_URL</code> and deploy the Node/Vercel API to publish shared settings.</>
+        )}
+      </div>
 
       {dirtyKeys.length > 0 && (
         <div className="rounded-lg border border-[rgba(var(--oui-color-warning),0.35)] bg-[rgba(var(--oui-color-warning),0.08)] px-4 py-2.5 text-sm text-[rgb(var(--oui-color-warning))]">

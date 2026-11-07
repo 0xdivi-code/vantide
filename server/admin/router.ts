@@ -16,8 +16,10 @@ import {
   listResource,
   parseListParams,
   readAudit,
+  readRuntimeConfig,
   recordAudit,
   updateRow,
+  updateRuntimeConfig,
   type ResourceName,
 } from "./store";
 import {
@@ -32,8 +34,13 @@ import {
   type AdminResponse,
   type DataMode,
 } from "./types";
+import {
+  isSharedRuntimeConfigKey,
+  validateSharedRuntimeConfigValue,
+  type SharedRuntimeConfigChanges,
+} from "../../shared/runtime-config";
 
-export const ADMIN_API_VERSION = "1.0.0";
+export const ADMIN_API_VERSION = "1.1.0";
 export const SESSION_HEADER = "x-admin-session";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
@@ -216,6 +223,45 @@ async function create(
   return json(201, { success: true, data: created, meta: { resource, api: ADMIN_API_VERSION } });
 }
 
+const MAX_RUNTIME_CONFIG_VALUE_BYTES = 2_200_000;
+const MAX_RUNTIME_CONFIG_TOTAL_BYTES = 2_500_000;
+
+function parseRuntimeConfigChanges(body: unknown): SharedRuntimeConfigChanges {
+  const envelope = asRecord(body);
+  const input = asRecord(envelope?.changes);
+  if (!input) {
+    throw badRequest('Send a JSON object shaped as {"changes":{"VITE_APP_NAME":"My DEX"}}. Use null to remove an override.');
+  }
+  const entries = Object.entries(input);
+  if (entries.length === 0) throw badRequest("At least one runtime configuration change is required.");
+  if (entries.length > 40) throw badRequest("No more than 40 runtime configuration keys can be changed at once.");
+
+  let totalBytes = 0;
+  const changes: SharedRuntimeConfigChanges = {};
+  for (const [key, value] of entries) {
+    if (!isSharedRuntimeConfigKey(key)) {
+      throw badRequest(`Runtime configuration key "${key}" is not shared-config writable.`);
+    }
+    if (value !== null && typeof value !== "string") {
+      throw badRequest(`Runtime configuration "${key}" must be a string or null.`);
+    }
+    if (typeof value === "string") {
+      const validationError = validateSharedRuntimeConfigValue(key, value);
+      if (validationError) throw badRequest(validationError);
+      const bytes = Buffer.byteLength(value, "utf8");
+      if (bytes > MAX_RUNTIME_CONFIG_VALUE_BYTES) {
+        throw badRequest(`Runtime configuration "${key}" exceeds the 2.2 MB value limit.`);
+      }
+      totalBytes += bytes;
+    }
+    changes[key] = value;
+  }
+  if (totalBytes > MAX_RUNTIME_CONFIG_TOTAL_BYTES) {
+    throw badRequest("The combined runtime configuration values exceed the 2.5 MB limit.");
+  }
+  return changes;
+}
+
 /* ------------------------------------------------------------------ */
 /* Dispatch                                                           */
 /* ------------------------------------------------------------------ */
@@ -252,6 +298,17 @@ export async function route(
     throw methodNotAllowed(method);
   }
 
+  // Safe frontend overrides are public reads, never public writes. This route
+  // stays available without MongoDB so a static config.js fallback still works.
+  if (path === "/runtime-config" && method === "GET") {
+    const state = await readRuntimeConfig(env);
+    return ok(
+      { values: state.values, updated_at: state.updated_at },
+      { public: true },
+      { "cache-control": "no-store" }
+    );
+  }
+
   if (path === "/auth/login") {
     if (method !== "POST") throw methodNotAllowed(method);
     const body = asRecord(request.body);
@@ -278,9 +335,11 @@ export async function route(
       return ok({
         name: "Vantide Admin API",
         version: ADMIN_API_VERSION,
-        docs: "docs/admin-api.md",
+        docs: "docs/admin-data-api.md",
         endpoints: [
           "GET /health",
+          "GET /runtime-config (public safe keys)",
+          "PATCH /runtime-config (authenticated)",
           "GET /me",
           "GET /overview",
           "GET /audit",
@@ -312,6 +371,23 @@ export async function route(
     return me(context, env);
   }
 
+  if (path === "/runtime-config") {
+    if (method !== "PATCH") throw methodNotAllowed(method);
+    const changes = parseRuntimeConfigChanges(request.body);
+    const updated = await updateRuntimeConfig(env, changes, caller.email);
+    await recordAudit(env, {
+      actor: caller.email,
+      action: "update",
+      resource: "runtime-config",
+      target: "public",
+      details: {
+        keys: Object.keys(changes),
+        removed: Object.entries(changes).filter(([, value]) => value === null).map(([key]) => key),
+      },
+    });
+    return ok(updated, { store: dataMode }, { "cache-control": "no-store" });
+  }
+
   if (path === "/overview") {
     if (method !== "GET") throw methodNotAllowed(method);
     return overview(env, context);
@@ -320,7 +396,8 @@ export async function route(
   if (path === "/audit") {
     if (method !== "GET") throw methodNotAllowed(method);
     const limit = Number(request.query.limit ?? "50");
-    return ok({ rows: await readAudit(env, Number.isFinite(limit) ? limit : 50) }, { store: dataMode });
+    const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), 200) : 50;
+    return ok({ rows: await readAudit(env, safeLimit) }, { store: dataMode });
   }
 
   const match = matchRoute(path);
@@ -355,14 +432,9 @@ export function corsHeaders(request: AdminRequest, env: AdminApiEnv): Record<str
   const allowed = env.allowedOrigins.some(
     (entry) => entry === "*" || entry.toLowerCase() === origin.toLowerCase()
   );
-  let sameOrigin = false;
-  try {
-    sameOrigin = new URL(origin).origin === origin;
-  } catch {
-    sameOrigin = false;
-  }
-
-  if (allowed || (sameOrigin && env.allowedOrigins.length === 0)) {
+  // Same-origin browser calls do not need CORS response headers. An empty
+  // allowlist must therefore deny cross-origin reads, not reflect any origin.
+  if (allowed) {
     headers["access-control-allow-origin"] = origin;
     headers["access-control-allow-credentials"] = "true";
   }

@@ -237,6 +237,143 @@ test("CORS headers are omitted for origins that are not allowed", async () => {
   assert.equal(response.headers["access-control-allow-origin"], undefined);
 });
 
+test("CORS does not reflect arbitrary origins when the allowlist is empty", async () => {
+  const response = await call("/runtime-config", {
+    headers: { origin: "https://unrelated.example" },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers["access-control-allow-origin"], undefined);
+  assert.equal(response.headers["access-control-allow-credentials"], undefined);
+});
+
+test("runtime config has public safe reads and authenticated audited updates", async () => {
+  reset();
+  const empty = await call("/runtime-config");
+  assert.equal(empty.status, 200);
+  assert.deepEqual(empty.body.data.values, {});
+  assert.equal(empty.body.data.updated_by, undefined);
+  assert.equal(empty.headers["cache-control"], "no-store");
+
+  const anonymousWrite = await call("/runtime-config", {
+    method: "PATCH",
+    body: { changes: { VITE_APP_NAME: "Should not save" } },
+  });
+  assert.equal(anonymousWrite.status, 401);
+
+  const forbidden = await call("/runtime-config", {
+    method: "PATCH",
+    token: adminToken(),
+    body: { changes: { VITE_ANALYTICS_SCRIPT: "<script>alert(1)</script>" } },
+  });
+  assert.equal(forbidden.status, 400);
+  assert.match(forbidden.body.message, /not shared-config writable/);
+
+  const published = await call("/runtime-config", {
+    method: "PATCH",
+    token: adminToken(),
+    body: {
+      changes: {
+        VITE_APP_NAME: "Vantide Shared",
+        THEME_COLOR_PRIMARY: "#112233",
+        VITE_ENABLE_CAMPAIGNS: "true",
+      },
+    },
+  });
+  assert.equal(published.status, 200);
+  assert.equal(published.body.data.store, "memory");
+  assert.equal(published.body.data.updated_by, "service@local");
+  assert.equal(published.body.data.values.VITE_APP_NAME, "Vantide Shared");
+
+  const publicRead = await call("/runtime-config");
+  assert.equal(publicRead.body.data.values.THEME_COLOR_PRIMARY, "#112233");
+  assert.equal(publicRead.body.data.values.VITE_ENABLE_CAMPAIGNS, "true");
+  assert.equal(publicRead.body.data.values.VITE_ANALYTICS_SCRIPT, undefined);
+  assert.equal(publicRead.body.data.updated_by, undefined);
+  assert.equal(JSON.stringify(publicRead.body).includes(API_KEY), false);
+
+  const removed = await call("/runtime-config", {
+    method: "PATCH",
+    token: adminToken(),
+    body: { changes: { VITE_APP_NAME: null } },
+  });
+  assert.equal(removed.status, 200);
+  assert.equal(removed.body.data.values.VITE_APP_NAME, undefined);
+
+  const audit = await call("/audit?limit=2", { token: adminToken() });
+  assert.equal(audit.body.data.rows[0].resource, "runtime-config");
+  assert.deepEqual(audit.body.data.rows[0].details.removed, ["VITE_APP_NAME"]);
+  assert.deepEqual(audit.body.data.rows[1].details.keys.sort(), [
+    "THEME_COLOR_PRIMARY",
+    "VITE_APP_NAME",
+    "VITE_ENABLE_CAMPAIGNS",
+  ]);
+  assert.equal(JSON.stringify(audit.body.data.rows).includes("Vantide Shared"), false);
+});
+
+test("runtime config validates value types and rejects empty patches", async () => {
+  reset();
+  const emptyPatch = await call("/runtime-config", {
+    method: "PATCH",
+    token: adminToken(),
+    body: { changes: {} },
+  });
+  assert.equal(emptyPatch.status, 400);
+
+  const wrongType = await call("/runtime-config", {
+    method: "PATCH",
+    token: adminToken(),
+    body: { changes: { VITE_ENABLE_CAMPAIGNS: true } },
+  });
+  assert.equal(wrongType.status, 400);
+
+  const unsafeMenu = await call("/runtime-config", {
+    method: "PATCH",
+    token: adminToken(),
+    body: { changes: { VITE_CUSTOM_MENUS: "Click me,javascript:alert(1)" } },
+  });
+  assert.equal(unsafeMenu.status, 400);
+  assert.match(unsafeMenu.body.message, /custom menu/);
+
+  const invalidColor = await call("/runtime-config", {
+    method: "PATCH",
+    token: adminToken(),
+    body: { changes: { THEME_COLOR_PRIMARY: "red;position:fixed" } },
+  });
+  assert.equal(invalidColor.status, 400);
+  assert.match(invalidColor.body.message, /hex color/);
+
+  const after = await call("/runtime-config");
+  assert.deepEqual(after.body.data.values, {});
+});
+
+test("production disables memory storage and demo seeds by default", async () => {
+  reset();
+  const production = env({ NODE_ENV: "production" });
+  assert.equal(production.allowMemoryStore, false);
+  assert.equal(production.seedEmptyCollections, false);
+
+  const unavailable = await call("/users", { token: adminToken(), environment: production });
+  assert.equal(unavailable.status, 503);
+  assert.equal(unavailable.body.code, "STORE_DISABLED");
+
+  // Public safe config remains readable so config.js fallback can still boot.
+  const publicConfig = await call("/runtime-config", { environment: production });
+  assert.equal(publicConfig.status, 200);
+  assert.deepEqual(publicConfig.body.data.values, {});
+
+  reset();
+  const explicitLocal = env({
+    NODE_ENV: "production",
+    ADMIN_API_ALLOW_MEMORY_STORE: "true",
+  });
+  const users = await call("/users?limit=100", {
+    token: adminToken(),
+    environment: explicitLocal,
+  });
+  assert.equal(users.status, 200);
+  assert.deepEqual(users.body.data.rows, []);
+});
+
 test("overview aggregates the store", async () => {
   reset();
   const response = await call("/overview", { token: adminToken() });

@@ -10,11 +10,21 @@ import {
 } from "lucide-react";
 import {
   getAdminOverrideValue,
+  getSharedAdminOverrides,
   removeAdminOverride,
   setAdminOverride,
   generateConfigJs,
 } from "@/admin/adminStore";
-import { getRuntimeConfig } from "@/utils/runtime-config";
+import { applySharedRuntimeConfig, getRuntimeConfig } from "@/utils/runtime-config";
+import {
+  getAdminApiBaseUrl,
+  publishSharedRuntimeConfig,
+} from "@/admin/api/client";
+import {
+  isSharedRuntimeConfigKey,
+  validateSharedRuntimeConfigValue,
+  type SharedRuntimeConfigChanges,
+} from "../../../shared/runtime-config";
 import { withBasePath } from "@/utils/base-path";
 import { useConfigVersion } from "@/admin/useConfigVersion";
 import {
@@ -77,18 +87,58 @@ function LogoSlot({
   const inputRef = useRef<HTMLInputElement>(null);
   const [urlValue, setUrlValue] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const override = getAdminOverrideValue(def.configKey);
+  const sharedValue = getSharedAdminOverrides()[def.configKey];
+  const sharedApiAvailable = Boolean(getAdminApiBaseUrl());
   const effective = def.effectiveSrc();
   const fallback = def.defaultSrc();
   const shown = effective || fallback;
+
+  const publishCurrent = async () => {
+    if (publishing || !isSharedRuntimeConfigKey(def.configKey)) return;
+    const value = getRuntimeConfig(def.configKey);
+    if (!value) {
+      onFlash("error", `Set a custom ${def.title.toLowerCase()} before publishing.`);
+      return;
+    }
+    setPublishing(true);
+    const changes: SharedRuntimeConfigChanges = { [def.configKey]: value };
+    try {
+      const state = await publishSharedRuntimeConfig(changes);
+      removeAdminOverride(def.configKey);
+      applySharedRuntimeConfig(state.values);
+      onFlash("success", `${def.title} published for visitors on their next page load.`);
+    } catch (error) {
+      onFlash("error", error instanceof Error ? error.message : `Could not publish ${def.title}.`);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const clearShared = async () => {
+    if (publishing || !isSharedRuntimeConfigKey(def.configKey)) return;
+    setPublishing(true);
+    const changes: SharedRuntimeConfigChanges = { [def.configKey]: null };
+    try {
+      const state = await publishSharedRuntimeConfig(changes);
+      removeAdminOverride(def.configKey);
+      applySharedRuntimeConfig(state.values);
+      onFlash("success", `${def.title} shared override removed; the deployed default is active.`);
+    } catch (error) {
+      onFlash("error", error instanceof Error ? error.message : `Could not clear shared ${def.title}.`);
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   const applyDataUrl = (dataUrl: string, sizeLabel: string) => {
     const result = setAdminOverride(def.configKey, dataUrl);
     if (result.ok) {
       onFlash(
         "success",
-        `${def.title} updated (${sizeLabel}). It is live across the app now — check the header.`
+        `${def.title} local preview updated (${sizeLabel}). Publish it to share with visitors.`
       );
     } else {
       onFlash("error", result.error);
@@ -138,14 +188,16 @@ function LogoSlot({
   const applyUrl = () => {
     const url = urlValue.trim();
     if (!url) return;
-    if (!/^(https?:)?\/\//.test(url) && !url.startsWith("data:image/")) {
-      onFlash("error", "Enter a full image URL (https://… or data:image/…).");
+    if (!isSharedRuntimeConfigKey(def.configKey)) return;
+    const validationError = validateSharedRuntimeConfigValue(def.configKey, url);
+    if (validationError) {
+      onFlash("error", validationError);
       return;
     }
     const result = setAdminOverride(def.configKey, url);
     if (result.ok) {
       setUrlValue("");
-      onFlash("success", `${def.title} updated. It is live across the app now.`);
+      onFlash("success", `${def.title} local preview updated. Publish it to share with visitors.`);
     } else {
       onFlash("error", result.error);
     }
@@ -153,7 +205,7 @@ function LogoSlot({
 
   const reset = () => {
     removeAdminOverride(def.configKey);
-    onFlash("success", `${def.title} reset to the default.`);
+    onFlash("success", `${def.title} local preview cleared; shared or deployed branding is restored.`);
   };
 
   return (
@@ -161,8 +213,8 @@ function LogoSlot({
       title={def.title}
       subtitle={def.description}
       actions={
-        <Badge tone={override ? "primary" : "neutral"}>
-          {override ? "Custom" : "Default"}
+        <Badge tone={override || sharedValue !== undefined ? "primary" : "neutral"}>
+          {override ? "Local preview" : sharedValue !== undefined ? "Shared" : "Default"}
         </Badge>
       }
     >
@@ -234,11 +286,28 @@ function LogoSlot({
           </AdminButton>
         </div>
 
-        {/* Reset */}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <AdminButton
+            variant="primary"
+            onClick={publishCurrent}
+            disabled={publishing || !sharedApiAvailable || !getRuntimeConfig(def.configKey)}
+            title={sharedApiAvailable ? "Publish the current custom image" : "Configure VITE_ADMIN_API_URL to publish"}
+          >
+            <Upload size={14} />
+            {publishing ? "Publishing…" : "Publish current"}
+          </AdminButton>
+          {sharedValue !== undefined && (
+            <AdminButton onClick={clearShared} disabled={publishing}>
+              <RotateCcw size={14} />
+              Clear shared
+            </AdminButton>
+          )}
+        </div>
+
         {override && (
-          <AdminButton variant="danger" className="w-full" onClick={reset}>
+          <AdminButton variant="danger" className="w-full" onClick={reset} disabled={publishing}>
             <RotateCcw size={14} />
-            Reset to default
+            Clear local preview
           </AdminButton>
         )}
       </div>
@@ -296,7 +365,7 @@ export default function AdminAppearance() {
     <div className="space-y-6">
       <PageHeader
         title="Appearance"
-        description="Change the dapp's branding. Uploads are stored in this browser and applied live, and can be exported for permanent deployment."
+        description="Preview branding privately, publish it through the audited admin API, or export config.js for static hosting."
         actions={
           <AdminButton onClick={() => downloadFile("config.js", generateConfigJs())}>
             <Download size={15} />
@@ -317,19 +386,14 @@ export default function AdminAppearance() {
         </div>
       </div>
 
-      <Card title="Making changes permanent">
+      <Card title="Publishing and static fallback">
         <ol className="list-decimal space-y-1.5 pl-5 text-sm text-white/60">
+          <li>Upload or link an image to create an instant local preview.</li>
           <li>
-            Customise the logos above — they apply instantly in this browser.
+            Click <span className="font-medium text-white">Publish current</span> to store the safe URL/data value through the authenticated admin API. The change is audited and reaches visitors on their next page load.
           </li>
           <li>
-            Click <span className="font-medium text-white">Export config.js</span>{" "}
-            to download the merged configuration.
-          </li>
-          <li>
-            Replace <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs">public/config.js</code>{" "}
-            in your deployment with the exported file so every visitor sees the
-            new branding.
+            On static-only hosting, click <span className="font-medium text-white">Export config.js</span> and replace <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs">public/config.js</code> in the deployment instead.
           </li>
         </ol>
         <p className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-[11px] leading-relaxed text-white/40">
