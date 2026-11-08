@@ -5,7 +5,7 @@ export default function AdminKyc() {
     <AdminResourcePage
       resource="kyc"
       title="KYC Management"
-      description="Live verification cases and compliance records fetched from your authenticated admin API."
+      description="Administrative KYC records only. No identity provider or compliance decision workflow is connected."
     />
   );
 }

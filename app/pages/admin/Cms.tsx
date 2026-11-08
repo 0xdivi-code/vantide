@@ -5,7 +5,7 @@ export default function AdminCms() {
     <AdminResourcePage
       resource="cms"
       title="Content Management"
-      description="Live announcements, pages, and publishing records fetched from your authenticated admin API."
+      description="Administrative content records. No public rendering or publishing pipeline is connected to these rows."
     />
   );
 }

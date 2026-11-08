@@ -29,6 +29,7 @@ For local development only, `ADMIN_API_SEED_EMPTY=true` fills empty resource col
 yarn dev          # app and same-origin admin API
 yarn api:dev      # standalone admin API on port 8787
 yarn test:api     # router/API tests
+yarn test:contracts # compile and execute vault tests on a local EVM
 yarn typecheck
 yarn build
 ```

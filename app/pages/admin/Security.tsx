@@ -5,7 +5,7 @@ export default function AdminSecurity() {
     <AdminResourcePage
       resource="security"
       title="Security Center"
-      description="Live access, alert, and audit records fetched from your authenticated admin API."
+      description="Administrative security records. These rows are not live login telemetry; only actual API mutations in /audit are authoritative."
     />
   );
 }

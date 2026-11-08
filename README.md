@@ -26,4 +26,8 @@ Key locations:
 - `app/admin/auth/session.ts` — browser session client
 - `api/admin/[...path].ts` — Vercel adapter
 
-Full setup: [Getting started](./docs/getting-started.md) · [Admin API](./docs/admin-data-api.md)
+## Operator treasury contract
+
+`contracts/OperatorTreasuryVault.sol` provides real owner-controlled native/ERC-20 treasury deposits, withdrawals, pause controls, two-step ownership, and events. `/admin/treasury` uses the connected EVM wallet and clearly separates those transactions from MongoDB records. Compile and execute the local EVM tests with `yarn test:contracts`; deployment requires explicit server-side owner, RPC, chain, and deployer inputs. No mainnet deployment is included.
+
+Full setup: [Getting started](./docs/getting-started.md) · [Admin API](./docs/admin-data-api.md) · [Treasury vault](./docs/treasury-vault.md)

@@ -10,6 +10,12 @@ window.__RUNTIME_CONFIG__ = {
   VITE_ORDERLY_MAINNET_CHAINS: "56",
   VITE_ORDERLY_TESTNET_CHAINS: "421614,97,10143,11124,901901901",
   VITE_DEFAULT_CHAIN: "",
+  // Optional operator-owned treasury vault. These financial addresses are
+  // intentionally deployment-controlled, not writable through shared config.
+  // Leave blank until contracts/OperatorTreasuryVault.sol is deployed and reviewed.
+  VITE_TREASURY_CHAIN_ID: "",
+  VITE_TREASURY_VAULT_ADDRESS: "",
+  VITE_TREASURY_TOKEN_ADDRESS: "",
   VITE_PRIVY_APP_ID: "",
   VITE_PRIVY_LOGIN_METHODS: "email",
   VITE_PRIVY_TERMS_OF_USE: "",

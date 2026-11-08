@@ -5,7 +5,7 @@ export default function AdminSupport() {
     <AdminResourcePage
       resource="support"
       title="Support Center"
-      description="Live support cases and conversation records fetched from your authenticated admin API."
+      description="Administrative support records. No external ticketing provider or customer message delivery is connected."
     />
   );
 }

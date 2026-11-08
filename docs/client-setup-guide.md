@@ -37,6 +37,10 @@ Deploy, visit `/admin`, and use the bootstrap credentials. The server creates th
 
 The login response is an opaque random token, not a JWT. MongoDB stores only its SHA-256 hash in `admin_sessions`, and a TTL index removes expired sessions.
 
+## Operator treasury
+
+The optional `VITE_TREASURY_CHAIN_ID`, `VITE_TREASURY_VAULT_ADDRESS`, and `VITE_TREASURY_TOKEN_ADDRESS` values connect `/admin/treasury` to a deployed `OperatorTreasuryVault`. Leave them blank until deployment and review are complete. These addresses are public but deployment-controlled; they cannot be edited through shared runtime config. Server-side RPC/deployment credentials belong in `.env.local`, never in this file. See [Treasury vault](./treasury-vault.md).
+
 ## Vercel
 
 Add all non-`VITE_*` settings under Project Settings → Environment Variables. The function at `api/admin/[...path].ts` serves the API. Keep `VITE_ADMIN_API_URL` same-origin (`/api/admin`) unless you intentionally run the standalone API elsewhere and configure `ADMIN_API_ALLOWED_ORIGINS`.

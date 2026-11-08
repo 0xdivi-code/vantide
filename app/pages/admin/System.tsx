@@ -5,7 +5,7 @@ export default function AdminSystem() {
     <AdminResourcePage
       resource="system"
       title="System Status"
-      description="Live service health, deployment, and platform status fetched from your authenticated admin API."
+      description="Administrative system flags and status records. These rows are not live service telemetry or exchange kill switches."
       pollInterval={60_000}
     />
   );

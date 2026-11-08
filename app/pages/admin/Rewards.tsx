@@ -5,7 +5,7 @@ export default function AdminRewards() {
     <AdminResourcePage
       resource="rewards"
       title="Rewards System"
-      description="Live campaign and distribution records fetched from your authenticated admin API."
+      description="Administrative reward records. No campaign distribution or on-chain payout workflow is connected."
     />
   );
 }

@@ -230,7 +230,7 @@ export default function AdminUserDetail() {
       <AdminResourcePage
         resource={`users/${encodeURIComponent(identifier)}`}
         title="User Record"
-        description="Live user detail fetched from your authenticated admin API."
+        description="Administrative user detail from your authenticated admin API; private identity fields are not synchronized with Orderly."
       />
     );
   }

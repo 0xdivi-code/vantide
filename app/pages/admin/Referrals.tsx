@@ -5,7 +5,7 @@ export default function AdminReferrals() {
     <AdminResourcePage
       resource="referrals"
       title="Referral Management"
-      description="Live affiliate, commission, and payout records fetched from your authenticated admin API."
+      description="Administrative referral records. These rows are not the live Orderly affiliate ledger and cannot pay commissions."
     />
   );
 }

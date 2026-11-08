@@ -5,7 +5,7 @@ export default function AdminFunding() {
     <AdminResourcePage
       resource="funding"
       title="Deposits & Withdrawals"
-      description="Live deposit, withdrawal, and funding records fetched from your authenticated admin API."
+      description="Administrative funding records only. These rows are not Orderly/wallet ledger entries and cannot approve deposits or withdrawals."
     />
   );
 }

@@ -5,7 +5,7 @@ export default function AdminNotifications() {
     <AdminResourcePage
       resource="notifications"
       title="Notification Center"
-      description="Live delivery history and notification records fetched from your authenticated admin API."
+      description="Administrative notification records. No delivery worker is connected, and a row does not prove that a message was sent."
     />
   );
 }

@@ -194,7 +194,7 @@ export default function AdminUsers() {
       <AdminResourcePage
         resource="users"
         title="User Management"
-        description="Live user records fetched from your authenticated admin API."
+        description="Administrative user records from your authenticated admin API. These are not private Orderly account profiles or account controls."
       />
     );
   }
